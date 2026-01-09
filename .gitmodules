@@ -1,0 +1,4 @@
+[submodule "packages/krsplan-engine"]
+	path = packages/krsplan-engine
+	url = https://github.com/farhanisty/krsplan-engine.git
+	branch = main
