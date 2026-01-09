@@ -2,14 +2,18 @@
     "name": "krsplan",
     "version": "1.0.0",
     "private": true,
+    "packageManager": "pnpm@10.27.0",
     "scripts": {
-        "dev": "npx pnpm --filter krsplan-engine build --watch & npx pnpm --filter web dev",
-        "build:packages": "npx pnpm --filter krsplan-engine build && npx pnpm --filter @krs/engine build",
-        "build:web": "npx pnpm --filter web build",
-        "build": "npx pnpm run build:packages && npx pnpm run build:web",
-        "install:all": "npx pnpm install"
+        "dev": "pnpm --filter krsplan-engine build --watch & pnpm --filter web dev",
+        "build:packages": "pnpm --filter krsplan-engine build && pnpm --filter @krs/engine build",
+        "build:web": "pnpm --filter web build",
+        "build": "pnpm run build:packages && pnpm run build:web",
+        "install:all": "pnpm install"
     },
     "devDependencies": {
+        "next": "14.2.3",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
         "typescript": "^5.7.2"
     }
 }
