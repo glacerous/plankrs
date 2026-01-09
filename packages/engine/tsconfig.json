@@ -9,12 +9,7 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "moduleResolution": "node",
-        "baseUrl": ".",
-        "paths": {
-            "krsplan-engine": [
-                "../krsplan-engine/src/index"
-            ]
-        }
+        "baseUrl": "."
     },
     "include": [
         "src/**/*"
