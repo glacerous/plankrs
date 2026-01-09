@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Sidebar } from "@/components/Sidebar";
+import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"] });
 
 export const metadata: Metadata = {
-    title: "KRS Plan",
-    description: "Plan your KRS easily",
+    title: "KRS PLAN — Academic Schedule Optimizer",
+    description: "A professional tool for optimizing your academic schedule.",
 };
-
-import { Sidebar } from "@/components/Sidebar";
 
 export default function RootLayout({
     children,
@@ -17,14 +18,22 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
-            <body className={inter.className}>
-                <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
-                    <Sidebar />
-                    <main className="flex-1 overflow-y-auto">
-                        {children}
-                    </main>
-                </div>
+        <html lang="en" suppressHydrationWarning>
+            <body className={`${inter.className} bg-background text-foreground transition-colors duration-200`}>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    <div className="flex h-screen overflow-hidden">
+                        <Sidebar />
+                        <main className="flex-1 overflow-y-auto relative no-scrollbar">
+                            {children}
+                        </main>
+                    </div>
+                    <Toaster position="top-right" richColors closeButton />
+                </ThemeProvider>
             </body>
         </html>
     );

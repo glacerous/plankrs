@@ -1,18 +1,18 @@
 "use client";
 
-import { useAppStore } from "@/lib/store";
+import { useAppStore, Subject } from "@/lib/store";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo } from "react";
-import { AlertCircle, CheckCircle2, ChevronRight, Users, MapPin, Clock, Calendar, Layout } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, ChevronRight, Users, MapPin, Clock, Calendar, ChevronDown, ChevronUp, AlertTriangle, Check, Zap, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { checkClassConflict } from "@krs/engine";
 import { ScheduleGrid } from "@/components/ScheduleGrid";
+import { toast } from "sonner";
 
 export default function PlanDetailPage() {
     const params = useParams();
     const id = params.id as string;
-    const router = useRouter();
     const { plans, datasources, updatePlan } = useAppStore();
 
     const plan = plans.find(p => p.id === id);
@@ -40,7 +40,6 @@ export default function PlanDetailPage() {
         const res: Record<string, boolean> = {};
 
         const selectedClasses = activeClassesForGrid;
-
         for (let i = 0; i < selectedClasses.length; i++) {
             for (let j = i + 1; j < selectedClasses.length; j++) {
                 if (checkClassConflict(selectedClasses[i]!, selectedClasses[j]!)) {
@@ -52,173 +51,231 @@ export default function PlanDetailPage() {
         return res;
     }, [activeClassesForGrid]);
 
-    if (!plan || !ds) return <div className="p-20 text-center">Plan not found</div>;
+    const conflictCount = useMemo(() => Object.keys(conflicts).length, [conflicts]);
 
-    const handleSelectClass = (subjectId: string, classId: string) => {
+    if (!plan || !ds) return <div className="p-20 text-center font-bold uppercase text-muted-foreground/30 tracking-widest">Blueprint Instance Missing</div>;
+
+    const handleSelectClass = (subjectId: string, classId: string, sName: string, cName: string) => {
         const currentSelected = plan.selectedClassBySubjectId[subjectId];
         const newMapping = { ...plan.selectedClassBySubjectId };
 
         if (currentSelected === classId) {
-            // Unselect if same
             delete newMapping[subjectId];
+            toast.info("Class De-selected", { description: `${sName} Section ${cName}` });
         } else {
-            // Select new
             newMapping[subjectId] = classId;
+            toast.success("Class Selected", { description: `${sName} Section ${cName}` });
         }
 
         updatePlan(plan.id, { selectedClassBySubjectId: newMapping });
     };
 
-    const hasConflicts = Object.keys(conflicts).length > 0;
     const allSelectedCount = Object.keys(plan.selectedClassBySubjectId).length;
     const totalRequiredCount = selectedSubjects.length;
 
     return (
-        <div className="h-screen flex flex-col">
-            <header className="p-6 border-b bg-white dark:bg-zinc-950 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <Link href="/" className="text-[10px] uppercase font-black text-zinc-400 hover:text-blue-600 transition-colors">Plans</Link>
-                        <ChevronRight className="w-3 h-3 text-zinc-300" />
-                        <span className="text-[10px] uppercase font-black text-blue-600">Configure</span>
+        <div className="h-screen flex flex-col no-scrollbar overflow-hidden animate-in fade-in duration-500">
+            <header className="px-8 py-6 shrink-0 bg-background/80 backdrop-blur-md z-20 border-b border-border transition-colors flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-5">
+                    <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center border border-border">
+                        <Settings2 className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-black tracking-tight">{plan.name}</h2>
-                        <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-900 rounded text-[10px] font-bold text-zinc-500">{ds.name}</span>
+                    <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                            <Link href="/" className="text-[10px] uppercase font-bold text-muted-foreground/60 hover:text-primary transition-soft tracking-wider">Dashboard</Link>
+                            <ChevronRight className="w-3 h-3 text-muted-foreground/20" />
+                            <span className="text-[10px] uppercase font-bold text-primary tracking-widest">Configuration</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-black tracking-tight text-foreground leading-none">{plan.name}</h2>
+                            <div className="w-1 h-1 bg-muted-foreground/20 rounded-full" />
+                            <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none">{ds.name}</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="text-right hidden md:block">
-                        <p className="text-[10px] font-black uppercase text-zinc-400">Progress</p>
-                        <p className="text-sm font-black">{allSelectedCount} / {totalRequiredCount} Classes Selected</p>
+                <div className="flex items-center gap-5">
+                    {conflictCount > 0 ? (
+                        <div className="px-4 py-2 bg-destructive/10 border border-destructive/20 rounded-full flex items-center gap-2 shadow-sm">
+                            <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
+                            <span className="text-[9px] font-bold text-destructive uppercase tracking-widest leading-none">Conflicts: {conflictCount}</span>
+                        </div>
+                    ) : (
+                        allSelectedCount === totalRequiredCount && totalRequiredCount > 0 && (
+                            <div className="px-4 py-2 bg-primary/10 border border-primary/20 rounded-full flex items-center gap-2 shadow-sm">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                                <span className="text-[9px] font-bold text-primary uppercase tracking-widest leading-none">Optimal Selection</span>
+                            </div>
+                        )
+                    )}
+
+                    <div className="text-right hidden xl:block border-l border-border pl-5">
+                        <p className="text-[9px] font-bold uppercase text-muted-foreground/40 tracking-widest leading-none mb-1">Items Sync</p>
+                        <p className="text-[13px] font-black text-foreground tabular-nums leading-none">{allSelectedCount} / {totalRequiredCount}</p>
                     </div>
+
                     <Link
                         href={`/view?planId=${plan.id}`}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-2xl font-black transition-all shadow-lg text-sm",
-                            allSelectedCount === totalRequiredCount && !hasConflicts
-                                ? "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
-                                : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400 cursor-not-allowed"
+                            "flex items-center gap-2 px-6 py-2.5 rounded-lg font-black transition-soft text-[11px] uppercase tracking-widest border shrink-0",
+                            allSelectedCount === totalRequiredCount && conflictCount === 0
+                                ? "bg-primary border-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95"
+                                : "bg-muted text-muted-foreground/40 border-border cursor-not-allowed"
                         )}
                         onClick={(e) => {
-                            if (allSelectedCount !== totalRequiredCount || hasConflicts) e.preventDefault();
+                            if (allSelectedCount !== totalRequiredCount || conflictCount > 0) {
+                                e.preventDefault();
+                                toast.error("Configuration Check Failed", { description: "Finalize all selections for visualization." });
+                            }
                         }}
                     >
-                        <Calendar className="w-5 h-5" />
-                        FULL VIEW
+                        View Grid <ChevronRight className="w-4 h-4" />
                     </Link>
                 </div>
             </header>
 
             <div className="flex-1 flex overflow-hidden">
-                {/* Left: Class Selection List */}
-                <div className="w-1/2 lg:w-2/5 border-r overflow-y-auto p-6 space-y-10 bg-zinc-50/30 dark:bg-zinc-950/30">
+                {/* Left: Component List */}
+                <div className="w-[420px] border-r border-border overflow-y-auto p-6 space-y-4 no-scrollbar bg-card/10 transition-colors">
                     {selectedSubjects.map(subject => {
                         const selectedClassId = plan.selectedClassBySubjectId[subject.subjectId];
-
                         return (
-                            <div key={subject.subjectId} className="space-y-4">
-                                <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 bg-transparent sticky top-0 z-10 backdrop-blur-sm">
-                                    <span className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-2 py-0.5 rounded font-mono text-[10px] font-black">{subject.code}</span>
-                                    <h3 className="text-lg font-black truncate">{subject.name}</h3>
-                                    <span className="text-[10px] font-bold text-blue-600 ml-auto whitespace-nowrap">{subject.sks} SKS</span>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-3">
-                                    {subject.classes.map(cls => {
-                                        const isSelected = selectedClassId === cls.classId;
-                                        const isConflicting = conflicts[cls.classId];
-
-                                        return (
-                                            <div
-                                                key={cls.classId}
-                                                onClick={() => handleSelectClass(subject.subjectId, cls.classId)}
-                                                className={cn(
-                                                    "p-4 rounded-2xl border-2 cursor-pointer transition-all relative overflow-hidden group flex flex-col justify-between",
-                                                    isSelected
-                                                        ? isConflicting
-                                                            ? "border-red-500 bg-red-50 dark:bg-red-900/10 shadow-md shadow-red-500/10"
-                                                            : "border-blue-600 bg-blue-50 dark:bg-blue-900/10 shadow-md shadow-blue-500/10"
-                                                        : "border-zinc-100 dark:border-zinc-900 hover:border-zinc-200 dark:hover:border-zinc-800 bg-white dark:bg-zinc-950"
-                                                )}
-                                            >
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <span className={cn(
-                                                        "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-                                                        isSelected ? "bg-blue-600 text-white" : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400"
-                                                    )}>
-                                                        {cls.className}
-                                                    </span>
-                                                    {isConflicting && isSelected && (
-                                                        <AlertCircle className="w-4 h-4 text-red-500 animate-pulse" />
-                                                    )}
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                    {cls.meetings.map((m, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between text-[10px]">
-                                                            <div className="flex items-center gap-1.5 font-bold text-zinc-600 dark:text-zinc-400">
-                                                                <Clock className="w-3 h-3 text-blue-500/50" />
-                                                                {m.day}, {m.start}-{m.end}
-                                                            </div>
-                                                            <div className="flex items-center gap-1 text-zinc-400">
-                                                                <MapPin className="w-3 h-3" />
-                                                                {m.room}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                {isSelected && (
-                                                    <div className={cn(
-                                                        "absolute top-0 right-0 p-1 rounded-bl-xl text-white",
-                                                        isConflicting ? "bg-red-500" : "bg-blue-600"
-                                                    )}>
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <SubjectAccordion
+                                key={subject.subjectId}
+                                subject={subject}
+                                selectedClassId={selectedClassId}
+                                onSelectClass={(cId: string, cName: string) => handleSelectClass(subject.subjectId, cId, subject.name, cName)}
+                                conflicts={conflicts}
+                            />
                         );
                     })}
                 </div>
 
-                {/* Right: Live Preview Grid */}
-                <div className="flex-1 bg-white dark:bg-zinc-900 p-6 flex flex-col min-w-0 overflow-hidden relative">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-sm font-black flex items-center gap-2 uppercase tracking-tight">
-                            <Layout className="w-4 h-4 text-blue-600" />
-                            Live Schedule Preview
-                        </h3>
-                        {hasConflicts && (
-                            <div className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black animate-pulse flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> CONFLICT DETECTED
-                            </div>
-                        )}
+                {/* Right: Live Frame */}
+                <div className="flex-1 bg-muted/10 p-10 flex flex-col min-w-0 overflow-hidden relative transition-colors">
+                    <div className="mb-6 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
+                            <Zap className="w-3.5 h-3.5 text-primary" fill="currentColor" />
+                            <h3 className="text-[11px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                                Live Interface Preview
+                            </h3>
+                        </div>
                     </div>
 
-                    <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                    <div className="flex-1 overflow-hidden rounded-xl border border-border shadow-2xl transition-all duration-300">
                         <ScheduleGrid
                             selectedClasses={activeClassesForGrid}
                             conflicts={conflicts}
                             compact
                         />
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                    {!hasConflicts && allSelectedCount === totalRequiredCount && totalRequiredCount > 0 && (
-                        <div className="absolute inset-x-0 bottom-10 flex justify-center pointer-events-none">
-                            <div className="bg-green-600 text-white px-6 py-3 rounded-full font-black shadow-2xl flex items-center gap-2 animate-bounce pointer-events-auto">
-                                <CheckCircle2 className="w-5 h-5" />
-                                ALL SET! READY TO SAVE
-                            </div>
+interface SubjectAccordionProps {
+    subject: Subject;
+    selectedClassId: string | undefined;
+    onSelectClass: (cId: string, cName: string) => void;
+    conflicts: Record<string, boolean>;
+}
+
+function SubjectAccordion({ subject, selectedClassId, onSelectClass, conflicts }: SubjectAccordionProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const selectedClass = subject.classes.find((c) => c.classId === selectedClassId);
+
+    return (
+        <div className={cn(
+            "rounded-xl border transition-soft overflow-hidden realistic-shadow flex flex-col h-fit",
+            selectedClassId
+                ? "bg-primary/[0.04] border-primary/20"
+                : "bg-card border-border hover:border-primary/20"
+        )}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full p-5 text-left flex justify-between items-center group/btn"
+            >
+                <div className="flex-1 min-w-0 pr-4">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest group-hover/btn:text-primary transition-colors">{subject.code}</span>
+                        <div className="w-1 h-1 bg-muted-foreground/10 rounded-full" />
+                        <span className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">{subject.sks} SKS</span>
+                    </div>
+                    <h4 className="text-[13px] font-bold text-foreground truncate leading-snug">{subject.name}</h4>
+                    {selectedClass && !isOpen && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-primary animate-in fade-in slide-in-from-left-1">
+                            <Check className="w-3 h-3" strokeWidth={3} />
+                            <span className="uppercase tracking-widest">Sec {selectedClass.className}</span>
                         </div>
                     )}
                 </div>
-            </div>
+                <div className="p-1.5 bg-muted rounded-md group-hover/btn:bg-primary group-hover/btn:text-primary-foreground transition-soft shrink-0">
+                    {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 opacity-40" />}
+                </div>
+            </button>
+
+            {isOpen && (
+                <div className="px-5 pb-5 pt-1 space-y-2 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 gap-2 border-t border-border/40 pt-4">
+                        {subject.classes.map((cls) => {
+                            const isSelected = selectedClassId === cls.classId;
+                            const isConflicting = conflicts[cls.classId];
+
+                            return (
+                                <div
+                                    key={cls.classId}
+                                    onClick={() => onSelectClass(cls.classId, cls.className)}
+                                    className={cn(
+                                        "p-4 rounded-lg border transition-soft cursor-pointer group/item flex flex-col justify-between relative",
+                                        isSelected
+                                            ? isConflicting
+                                                ? "border-destructive bg-destructive/5"
+                                                : "border-primary bg-background shadow-sm ring-1 ring-primary/10"
+                                            : "border-border/50 bg-muted/10 hover:border-primary/30 hover:bg-muted/30"
+                                    )}
+                                >
+                                    <div className="flex justify-between items-center mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className={cn(
+                                                "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-soft",
+                                                isSelected ? "border-primary bg-primary" : "border-muted-foreground/20 group-hover/item:border-primary/40"
+                                            )}>
+                                                {isSelected && <div className="w-1 h-1 bg-primary-foreground rounded-full" />}
+                                            </div>
+                                            <span className={cn(
+                                                "text-[10px] font-bold uppercase tracking-widest",
+                                                isSelected ? "text-primary" : "text-muted-foreground/60"
+                                            )}>
+                                                Section {cls.className}
+                                            </span>
+                                        </div>
+                                        {isConflicting && isSelected && (
+                                            <AlertTriangle className="w-3.5 h-3.5 text-destructive animate-pulse" />
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-1.5 pl-6 border-l-2 border-muted/50 ml-2">
+                                        {cls.meetings.map((m: any, idxNum: number) => (
+                                            <div key={idxNum} className="flex flex-col">
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/80">
+                                                    <Clock className="w-3 h-3 text-muted-foreground/30" strokeWidth={3} />
+                                                    <span className="uppercase tracking-tighter">{m.day}, {m.start}-{m.end}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-[9px] font-medium text-muted-foreground/40 italic ml-4.5">
+                                                    <MapPin className="w-2.5 h-2.5" />
+                                                    {m.room}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

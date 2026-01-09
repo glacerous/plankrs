@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Database, CheckSquare, Square, Info } from "lucide-react";
+import { ChevronRight, Database, Search, CheckCircle, ListFilter, Layers, BookCheck } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function CreatePlanPage() {
@@ -13,10 +14,19 @@ export default function CreatePlanPage() {
     const [name, setName] = useState("");
     const [selectedDsId, setSelectedDsId] = useState("");
     const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
 
     const selectedDs = useMemo(() =>
         datasources.find(d => d.id === selectedDsId),
         [datasources, selectedDsId]);
+
+    const filteredSubjects = useMemo(() => {
+        if (!selectedDs) return [];
+        return selectedDs.subjects.filter(s =>
+            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.code.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [selectedDs, searchQuery]);
 
     const totalSks = useMemo(() => {
         if (!selectedDs) return 0;
@@ -26,13 +36,17 @@ export default function CreatePlanPage() {
     }, [selectedDs, selectedSubjectIds]);
 
     const handleToggleSubject = (id: string) => {
-        setSelectedSubjectIds(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
+        setSelectedSubjectIds(prev => {
+            const isRemoving = prev.includes(id);
+            return isRemoving ? prev.filter(i => i !== id) : [...prev, id];
+        });
     };
 
     const handleCreate = () => {
-        if (!name || !selectedDsId || selectedSubjectIds.length === 0) return;
+        if (!name || !selectedDsId || selectedSubjectIds.length === 0) {
+            toast.error("Process Aborted", { description: "Name, source, and subjects are required." });
+            return;
+        }
 
         const planId = addPlan({
             name,
@@ -41,112 +55,155 @@ export default function CreatePlanPage() {
             selectedClassBySubjectId: {},
         });
 
+        toast.success("Analysis Ready", { description: `Configuring schedule for "${name}"` });
         router.push(`/plan/${planId}`);
     };
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
-            <header className="mb-10">
-                <h2 className="text-3xl font-bold tracking-tight">Create New Plan</h2>
-                <p className="text-zinc-500">Select a datasource and pick the subjects you want to take.</p>
+        <div className="h-screen flex flex-col no-scrollbar overflow-hidden animate-in fade-in duration-500">
+            <header className="p-8 border-b border-border/50 shrink-0 bg-background/80 backdrop-blur-md z-20 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-black tracking-tight text-foreground">Design Plan</h1>
+                    <div className="flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Configuration Pipeline</span>
+                    </div>
+                </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                {/* Left Card: Form */}
-                <div className="lg:col-span-4 space-y-6">
-                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                        <h3 className="font-bold text-lg mb-6 border-b pb-3">Plan Details</h3>
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-xs font-bold uppercase text-zinc-500 mb-2">Plan Name</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Optimis Lulus!"
-                                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-lg"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold uppercase text-zinc-500 mb-2">Select Datasource</label>
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left: Settings Sidebar */}
+                <div className="w-80 border-r border-border bg-card/10 p-8 overflow-y-auto no-scrollbar space-y-10 transition-colors">
+                    <section className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Identity</label>
+                            <input
+                                type="text"
+                                placeholder="Semester Blueprint Name"
+                                className="w-full bg-background border border-border px-4 py-2.5 rounded-lg text-[13px] font-medium focus:ring-1 focus:ring-primary outline-none transition-soft"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Infrastructure Source</label>
+                            <div className="relative">
+                                <Database className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 pointer-events-none" />
                                 <select
-                                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJtNiA5IDYgNiA2LTYiLz48L3N2Zz4=')] bg-[length:20px] bg-[right_1rem_center] bg-no-repeat"
+                                    className="w-full bg-background border border-border pl-10 pr-10 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest text-foreground focus:ring-1 focus:ring-primary outline-none transition-soft appearance-none cursor-pointer"
                                     value={selectedDsId}
                                     onChange={(e) => {
                                         setSelectedDsId(e.target.value);
                                         setSelectedSubjectIds([]);
                                     }}
                                 >
-                                    <option value="">-- Choose Datasource --</option>
+                                    <option value="" className="bg-card">Select Source</option>
                                     {datasources.map(ds => (
-                                        <option key={ds.id} value={ds.id}>{ds.name}</option>
+                                        <option key={ds.id} value={ds.id} className="bg-card">{ds.name}</option>
                                     ))}
                                 </select>
+                                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 pointer-events-none rotate-90" />
                             </div>
-
-                            <div className="pt-4 space-y-3">
-                                <div className="flex justify-between items-end border-b pb-2">
-                                    <span className="text-zinc-500 text-sm">Selected Subjects</span>
-                                    <span className="text-2xl font-black text-blue-600 leading-none">{selectedSubjectIds.length}</span>
-                                </div>
-                                <div className="flex justify-between items-end border-b pb-2">
-                                    <span className="text-zinc-500 text-sm">Total SKS</span>
-                                    <span className="text-2xl font-black text-blue-600 leading-none">{totalSks}</span>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleCreate}
-                                disabled={!name || !selectedDsId || selectedSubjectIds.length === 0}
-                                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-200 disabled:text-zinc-400 text-white py-4 rounded-xl font-black text-lg shadow-lg flex items-center justify-center gap-2 transition-all"
-                            >
-                                CREATE PLAN <ChevronRight className="w-6 h-6" />
-                            </button>
                         </div>
-                    </div>
+                    </section>
+
+                    <section className="p-6 bg-muted/30 border border-border/50 rounded-xl space-y-5">
+                        <div className="text-center space-y-1">
+                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Total Weight</p>
+                            <div className="flex items-center justify-center gap-1.5">
+                                <p className={cn("text-3xl font-black tabular-nums transition-colors", totalSks > 24 ? "text-destructive" : "text-primary")}>{totalSks}</p>
+                                <span className="text-[10px] font-black text-muted-foreground opacity-30 uppercase">SKS</span>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-background/50 border border-border/40 p-3 rounded-lg text-center">
+                                <p className="text-[8px] font-bold text-muted-foreground/60 uppercase">Items</p>
+                                <p className="text-xs font-black text-foreground">{selectedSubjectIds.length}</p>
+                            </div>
+                            <div className="bg-background/50 border border-border/40 p-3 rounded-lg text-center">
+                                <p className="text-[8px] font-bold text-muted-foreground/60 uppercase">Safe Limit</p>
+                                <p className="text-xs font-black text-foreground">24</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <button
+                        onClick={handleCreate}
+                        disabled={!name || !selectedDsId || selectedSubjectIds.length === 0 || totalSks > 24}
+                        className="w-full bg-primary hover:bg-primary/90 disabled:opacity-20 text-primary-foreground p-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-soft shadow-lg shadow-primary/10 flex items-center justify-center gap-2 active:scale-95 group overflow-hidden"
+                    >
+                        Initialize
+                        <ChevronRight className="w-4 h-4 transition-soft group-hover:translate-x-1" />
+                    </button>
                 </div>
 
-                {/* Right Card: Subject Selection */}
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[70vh]">
-                        <div className="p-6 bg-zinc-50 dark:bg-zinc-950 border-b flex justify-between items-center">
-                            <h3 className="font-bold text-lg">Choose Subjects</h3>
-                            {!selectedDs && <p className="text-xs text-orange-600 flex items-center gap-1"><Info className="w-3 h-3" /> Select a datasource first</p>}
+                {/* Right: Operations Feed */}
+                <div className="flex-1 flex flex-col bg-muted/10 p-8 overflow-hidden transition-colors">
+                    <div className="shrink-0 flex items-center justify-between gap-6 mb-8">
+                        <div className="relative flex-1 group">
+                            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Filter operands by name or designation..."
+                                className="w-full h-12 pl-12 pr-6 bg-background border border-border rounded-xl text-[13px] font-medium text-foreground placeholder:text-muted-foreground/20 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                disabled={!selectedDs}
+                            />
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                            {selectedDs ? (
-                                selectedDs.subjects.map(s => {
+                        <div className="flex items-center gap-2 px-3 shrink-0">
+                            <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest whitespace-nowrap">Subjects: {filteredSubjects.length}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar pr-2 pb-10">
+                        {selectedDs ? (
+                            filteredSubjects.length > 0 ? (
+                                filteredSubjects.map(s => {
                                     const isSelected = selectedSubjectIds.includes(s.subjectId);
                                     return (
                                         <div
                                             key={s.subjectId}
                                             onClick={() => handleToggleSubject(s.subjectId)}
                                             className={cn(
-                                                "p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-4",
+                                                "group p-4 rounded-xl border transition-soft cursor-pointer flex items-center gap-5 bg-card realistic-shadow",
                                                 isSelected
-                                                    ? "border-blue-600 bg-blue-50/50 dark:bg-blue-900/10"
-                                                    : "border-zinc-50 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                                    ? "border-primary bg-primary/[0.04] translate-x-1"
+                                                    : "border-border/50 hover:border-primary/30 hover:bg-muted/30"
                                             )}
                                         >
-                                            {isSelected ? <CheckSquare className="w-6 h-6 text-blue-600" /> : <Square className="w-6 h-6 text-zinc-300" />}
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded font-bold">{s.code}</span>
-                                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">{s.sks} SKS</span>
+                                            <div className={cn(
+                                                "w-6 h-6 rounded-md flex items-center justify-center transition-soft border-2 shrink-0",
+                                                isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-muted/50 border-border"
+                                            )}>
+                                                {isSelected && <BookCheck className="w-3.5 h-3.5" />}
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{s.code}</span>
+                                                    <div className="w-1 h-1 bg-muted-foreground/10 rounded-full" />
+                                                    <span className="text-[9px] font-bold text-primary/70 uppercase tracking-widest">{s.sks} SKS</span>
                                                 </div>
-                                                <h4 className="font-bold">{s.name}</h4>
-                                                <p className="text-xs text-zinc-500">{s.classes.length} classes available</p>
+                                                <h4 className={cn("text-[13px] font-bold transition-soft truncate leading-snug", isSelected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>
+                                                    {s.name}
+                                                </h4>
                                             </div>
                                         </div>
                                     );
                                 })
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-zinc-400 opacity-50 space-y-4">
-                                    <Database className="w-16 h-16" />
-                                    <p className="font-medium">No datasource selected</p>
+                                <div className="h-full flex flex-col items-center justify-center py-20 text-muted-foreground/20 uppercase font-bold text-[10px] tracking-widest">
+                                    Search Buffer Empty
                                 </div>
-                            )}
-                        </div>
+                            )
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center space-y-4 opacity-10">
+                                <ListFilter className="w-14 h-14" strokeWidth={1.5} />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Source Standby</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

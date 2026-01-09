@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Clock, MapPin, Maximize2, Minimize2, ZoomIn, AlertTriangle, Zap, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Meeting } from "@/lib/store";
 
@@ -15,8 +15,8 @@ interface ScheduleGridProps {
 }
 
 export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: ScheduleGridProps) {
-    const hourHeight = compact ? 60 : 100;
-    const totalHeight = HOURS.length * hourHeight;
+    const [rowHeight, setRowHeight] = useState(compact ? 70 : 120);
+    const totalHeight = HOURS.length * rowHeight;
 
     const getPosition = (meeting: Meeting) => {
         const dayIndex = DAYS.indexOf(meeting.day);
@@ -29,60 +29,87 @@ export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: Sc
         const endInMinutes = endH * 60 + endM;
 
         const gridStartInMinutes = 7 * 60;
-        const top = ((startInMinutes - gridStartInMinutes) / 60) * hourHeight;
-        const height = ((endInMinutes - startInMinutes) / 60) * hourHeight;
+        const top = ((startInMinutes - gridStartInMinutes) / 60) * rowHeight;
+        const height = ((endInMinutes - startInMinutes) / 60) * rowHeight;
 
         return { dayIndex, top, height };
     };
 
     return (
         <div className={cn(
-            "flex-1 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden flex flex-col h-full",
-            compact && "rounded-2xl shadow-sm"
+            "flex-1 bg-background flex flex-col h-full relative group/grid selection:bg-none select-none transition-colors",
+            compact ? "rounded-xl overflow-hidden" : "rounded-none"
         )}>
-            {/* Header Days */}
-            <div className="flex border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 shrink-0">
-                <div className={cn("w-20 border-r border-zinc-100 dark:border-zinc-800 p-4 text-center text-[10px] font-black text-zinc-400", compact && "w-12 p-2")}>
-                    {compact ? "" : "TIME"}
+            {/* Zoom Controls Overlay */}
+            {!compact && (
+                <div className="absolute top-6 right-6 z-50 flex flex-col gap-2 transition-soft sm:opacity-0 sm:group-hover/grid:opacity-100">
+                    {[
+                        { h: 70, icon: Minimize2, label: "Compact" },
+                        { h: 120, icon: Maximize2, label: "Default" },
+                        { h: 180, icon: ZoomIn, label: "Expanded" }
+                    ].map(btn => (
+                        <button
+                            key={btn.h}
+                            onClick={() => setRowHeight(btn.h)}
+                            className={cn(
+                                "p-2.5 rounded-lg border transition-soft realistic-shadow flex items-center justify-center",
+                                rowHeight === btn.h
+                                    ? "bg-primary border-primary text-primary-foreground scale-105"
+                                    : "bg-background border-border text-muted-foreground/40 hover:text-foreground hover:bg-muted"
+                            )}
+                        >
+                            <btn.icon className="w-4 h-4" />
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Header Days - Sticky */}
+            <div className="flex bg-card shrink-0 z-40 border-b border-border shadow-sm transition-colors">
+                <div className={cn("w-16 border-r border-border flex items-center justify-center p-4", compact && "w-12 p-2")}>
+                    <Zap className="w-3.5 h-3.5 text-primary/40" fill="currentColor" />
                 </div>
                 {DAYS.map(day => (
                     <div key={day} className={cn(
-                        "flex-1 p-4 text-center text-[10px] font-black tracking-[0.2em] text-zinc-600 dark:text-zinc-400 uppercase border-r last:border-r-0 border-zinc-100 dark:border-zinc-800",
-                        compact && "p-2 tracking-normal"
+                        "flex-1 p-4 text-center transition-colors border-r last:border-r-0 border-border bg-card",
+                        compact && "p-2 font-black text-muted-foreground/20 text-[9px] uppercase tracking-widest"
                     )}>
-                        {compact ? day.substring(0, 3) : day}
+                        {!compact && (
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">{day}</span>
+                        )}
+                        {compact && day.substring(0, 3)}
                     </div>
                 ))}
             </div>
 
-            {/* Grid Content */}
-            <div className="flex-1 relative overflow-y-auto overflow-x-hidden min-h-0">
+            {/* Grid Area */}
+            <div className="flex-1 relative overflow-y-auto no-scrollbar">
                 <div
                     className="relative flex"
                     style={{ height: `${totalHeight}px`, minWidth: "100%" }}
                 >
-                    {/* Time labels column */}
-                    <div className={cn("w-20 bg-zinc-50/30 dark:bg-zinc-950/30 border-r border-zinc-100 dark:border-zinc-800 shrink-0 h-full", compact && "w-12")}>
+                    {/* Time Column */}
+                    <div className={cn("w-16 bg-muted/20 border-r border-border shrink-0 h-full transition-colors", compact && "w-12")}>
                         {HOURS.map(hour => (
-                            <div key={hour} style={{ height: `${hourHeight}px` }} className="border-b border-zinc-50 dark:border-zinc-900/50 p-2 text-right pr-4">
-                                <span className="text-[10px] font-black text-zinc-400">{hour.toString().padStart(2, '0')}:00</span>
+                            <div key={hour} style={{ height: `${rowHeight}px` }} className="border-b border-border/30 p-2 text-right pr-3 group/hour relative">
+                                <span className="text-[10px] font-black text-muted-foreground/30 transition-soft group-hover/hour:text-primary leading-none">{hour.toString().padStart(2, '0')}:00</span>
                             </div>
                         ))}
                     </div>
 
-                    {/* Grid columns */}
+                    {/* Columns & Lines */}
                     {DAYS.map((day) => (
-                        <div key={day} className="flex-1 relative border-r last:border-r-0 border-zinc-100 dark:border-zinc-800 h-full">
+                        <div key={day} className="flex-1 relative border-r last:border-r-0 border-border/30 h-full">
                             {HOURS.map(hour => (
-                                <div key={hour} style={{ height: `${hourHeight}px` }} className="border-b border-zinc-50 dark:border-zinc-900/50" />
+                                <div key={hour} style={{ height: `${rowHeight}px` }} className="border-b border-border/30" />
                             ))}
                         </div>
                     ))}
 
-                    {/* Schedule Blocks Overlay */}
+                    {/* Overlays */}
                     <div
-                        className={cn("absolute inset-0 pointer-events-none")}
-                        style={{ left: compact ? "48px" : "80px" }}
+                        className="absolute inset-0 pointer-events-none transition-soft"
+                        style={{ left: compact ? "48px" : "64px" }}
                     >
                         <div className="relative h-full flex">
                             {DAYS.map((day) => (
@@ -100,33 +127,55 @@ export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: Sc
                                                     <div
                                                         key={`${cls.classId}-${mIdx}`}
                                                         className={cn(
-                                                            "absolute left-1 right-1 p-2 rounded-xl border-2 shadow-sm transition-all overflow-hidden flex flex-col justify-between pointer-events-auto",
+                                                            "absolute left-[2px] right-[2px] rounded-lg border transition-soft overflow-hidden flex flex-col pointer-events-auto group/block realistic-shadow",
                                                             isConflicting
-                                                                ? "bg-red-500/10 border-red-500 text-red-700 dark:text-red-400 z-20"
-                                                                : "bg-blue-600/10 border-blue-600 text-blue-800 dark:text-blue-300 z-10 hover:z-30",
-                                                            compact ? "rounded-lg p-1.5" : "p-3"
+                                                                ? "bg-destructive/10 border-destructive shadow-lg shadow-destructive/5 z-20"
+                                                                : "bg-card border-border hover:border-primary/50 hover:bg-muted/50 z-10 hover:z-30 hover:-translate-y-0.5",
+                                                            compact ? "p-2" : "p-4"
                                                         )}
-                                                        style={{ top: `${pos.top}px`, height: `${pos.height}px` }}
+                                                        style={{ top: `${pos.top + 2}px`, height: `${pos.height - 4}px` }}
                                                     >
-                                                        <div className="overflow-hidden">
-                                                            <p className={cn("font-black uppercase tracking-widest opacity-60 truncate", compact ? "text-[7px]" : "text-[9px]")}>
-                                                                {cls.subjectCode}
-                                                            </p>
-                                                            <h4 className={cn("font-black leading-tight line-clamp-2", compact ? "text-[8px]" : "text-xs")}>
+                                                        {/* Simple color indicator strip */}
+                                                        {!isConflicting && (
+                                                            <div className="absolute top-0 left-0 right-0 h-1 bg-primary/20 group-hover/block:bg-primary transition-colors" />
+                                                        )}
+                                                        {isConflicting && (
+                                                            <div className="absolute top-0 left-0 right-0 h-1 bg-destructive" />
+                                                        )}
+
+                                                        <div className="flex-1 min-w-0 space-y-0.5 mt-1">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className={cn("font-black tracking-[0.1em] opacity-40 uppercase truncate", compact ? "text-[7px]" : "text-[9px]")}>
+                                                                    {cls.subjectCode}
+                                                                </span>
+                                                                {isConflicting && <AlertTriangle className={cn("animate-pulse text-destructive", compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5")} />}
+                                                            </div>
+                                                            <h4 className={cn("font-bold leading-none truncate transition-soft text-foreground", compact ? "text-[10px]" : "text-[13px]")}>
                                                                 {cls.subjectName}
                                                             </h4>
                                                         </div>
-                                                        {!compact && (
-                                                            <div className="flex items-center justify-between mt-1">
-                                                                <span className="text-[10px] font-black opacity-80">CLASS {cls.className}</span>
-                                                                <span className="text-[9px] font-bold opacity-60">{m.room}</span>
+
+                                                        <div className="mt-auto space-y-1">
+                                                            <div className="flex items-center justify-between gap-2 overflow-hidden">
+                                                                <span className={cn("font-bold text-muted-foreground/60 uppercase", compact ? "text-[8px]" : "text-[10px]")}>Section {cls.className}</span>
+                                                                <div className="flex items-center gap-1 opacity-40 group-hover/block:opacity-100 transition-soft overflow-hidden">
+                                                                    <MapPin className={cn("shrink-0", compact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+                                                                    <span className={cn("font-bold truncate max-w-[60px]", compact ? "text-[8px]" : "text-[10px]")}>{m.room}</span>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        {isConflicting && (
-                                                            <div className="absolute top-1 right-1">
-                                                                <AlertCircle className={cn("text-red-500 animate-pulse", compact ? "w-2 h-2" : "w-3 h-3")} />
-                                                            </div>
-                                                        )}
+                                                            {!compact && rowHeight > 100 && (
+                                                                <div className="flex flex-col gap-1 pt-2 border-t border-border/50 animate-in fade-in duration-300">
+                                                                    <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/30">
+                                                                        <User className="w-2.5 h-2.5" />
+                                                                        <span className="truncate">{cls.lecturers?.join(" / ")}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/30">
+                                                                        <Clock className="w-2.5 h-2.5" />
+                                                                        <span>{m.start}—{m.end}</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 );
                                             });
