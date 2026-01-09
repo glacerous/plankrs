@@ -25,9 +25,23 @@
         "paths": {
             "@/*": [
                 "./src/*"
+            ],
+            "krsplan-engine": [
+                "../../packages/krsplan-engine/src"
+            ],
+            "@krs/engine": [
+                "../../packages/engine/src"
             ]
         }
     },
+    "references": [
+        {
+            "path": "../../packages/krsplan-engine"
+        },
+        {
+            "path": "../../packages/engine"
+        }
+    ],
     "include": [
         "next-env.d.ts",
         "**/*.ts",
