@@ -4,8 +4,9 @@
     "private": true,
     "scripts": {
         "dev": "npx pnpm --filter krsplan-engine build --watch & npx pnpm --filter web dev",
-        "build": "npx pnpm --filter krsplan-engine build && npx pnpm --filter @krs/engine build && npx pnpm --filter web build",
-        "build:web": "pnpm build",
+        "build:packages": "npx pnpm --filter krsplan-engine build && npx pnpm --filter @krs/engine build",
+        "build:web": "npx pnpm --filter web build",
+        "build": "npx pnpm run build:packages && npx pnpm run build:web",
         "install:all": "npx pnpm install"
     },
     "devDependencies": {
