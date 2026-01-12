@@ -49,7 +49,7 @@ export default function PlanDetailPage() {
             }
         }
         return res;
-    }, [activeClassesForGrid]);
+    }, [activeClassesForGrid, plan, ds]);
 
     const conflictCount = useMemo(() => Object.keys(conflicts).length, [conflicts]);
 
