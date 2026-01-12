@@ -1,4 +1,4 @@
-# KRS Plan
+# KRSlab
 
 Aplikasi perencanaan jadwal KRS (Kartu Rencana Studi) yang cerdas, menggunakan engine khusus untuk deteksi bentrok dan optimasi jadwal.
 

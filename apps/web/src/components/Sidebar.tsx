@@ -32,8 +32,8 @@ export function Sidebar() {
             <div className="p-6 border-b border-border/50">
                 <Link href="/" className="flex items-center gap-2.5 group">
 
-                    <span className="text-[13px] font-black tracking-widest text-foreground uppercase">
-                        KRS<span className="text-muted-foreground">PLAN</span>
+                    <span className="text-[13px] font-black tracking-widest text-foreground">
+                        KRS<span className="text-muted-foreground font-medium">lab</span>
                     </span>
                 </Link>
             </div>
