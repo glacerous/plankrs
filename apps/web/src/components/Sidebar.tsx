@@ -30,10 +30,15 @@ export function Sidebar() {
     return (
         <aside className="w-64 border-r border-border bg-card flex flex-col h-screen sticky top-0 z-50 overflow-hidden transition-colors">
             <div className="p-6 border-b border-border/50">
-                <Link href="/" className="flex items-center gap-2.5 group">
+                <Link href="/" className="flex items-center gap-2.5 group hover:opacity-90 transition-soft">
 
-                    <span className="text-[13px] font-black tracking-widest text-foreground">
-                        KRS<span className="text-muted-foreground font-medium">lab</span>
+                    <span className="flex items-baseline gap-1 leading-none">
+                        <span className="text-[22px] font-black tracking-tight text-foreground">
+                            KRS
+                        </span>
+                        <span className="text-[18px] font-extrabold tracking-tight bg-gradient-to-r from-primary to-foreground bg-clip-text text-transparent">
+                            lab
+                        </span>
                     </span>
                 </Link>
             </div>

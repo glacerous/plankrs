@@ -157,7 +157,7 @@ export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: Sc
 
                                                         <div className="mt-1.5 space-y-0.5">
                                                             <div className="flex items-center justify-between gap-2 overflow-hidden">
-                                                                <span className={cn("font-bold text-foreground/60 uppercase", compact ? "text-[8px]" : "text-[9px]")}>S-{cls.className}</span>
+                                                                <span className={cn("font-bold text-foreground/60 uppercase", compact ? "text-[8px]" : "text-[9px]")}>{cls.className}</span>
                                                                 <div className="flex items-center gap-1 text-foreground/40 group-hover/block:text-foreground/70 transition-soft overflow-hidden">
                                                                     <MapPin className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
                                                                     <span className={cn("font-bold truncate max-w-[50px]", compact ? "text-[8px]" : "text-[9px]")}>{m.room}</span>
