@@ -63,6 +63,10 @@ interface AppStore {
     activePlanId: string | null;
     activeDatasourceId: string | null;
     isGenerating: boolean;
+    _hasHydrated: boolean;
+
+    // Actions
+    setHasHydrated: (state: boolean) => void;
 
     // Datasource Actions
     addDatasource: (name: string, subjects: Subject[]) => string;
@@ -111,6 +115,9 @@ export const useAppStore = create<AppStore>()(
             activePlanId: null,
             activeDatasourceId: null,
             isGenerating: false,
+            _hasHydrated: false,
+
+            setHasHydrated: (state) => set({ _hasHydrated: state }),
 
             addDatasource: (name, subjects) => {
                 const id = crypto.randomUUID();
@@ -519,6 +526,11 @@ export const useAppStore = create<AppStore>()(
         }),
         {
             name: "krs-plan-next-gen",
+            onRehydrateStorage: (state) => {
+                return () => {
+                    state?.setHasHydrated(true);
+                };
+            },
         }
     )
 );

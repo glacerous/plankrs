@@ -14,12 +14,13 @@ export function Sidebar() {
     const activePlanId = useAppStore((state) => state.activePlanId);
     const plans = useAppStore((state) => state.plans);
     const datasources = useAppStore((state) => state.datasources);
+    const _hasHydrated = useAppStore((state) => state._hasHydrated);
     const activePlan = plans.find(p => p.id === activePlanId);
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
     const [isDismissed, setIsDismissed] = useState(true); // Default to true until checked
 
-    const showOnboarding = mounted && !isDismissed && datasources.length === 0;
+    const showOnboarding = mounted && _hasHydrated && !isDismissed && datasources.length === 0;
 
     // Initial check and auto-nav
     useEffect(() => {
@@ -27,10 +28,10 @@ export function Sidebar() {
         const dismissed = localStorage.getItem("krs_onboard_ds_dismissed") === "1";
         setIsDismissed(dismissed);
 
-        if (!dismissed && datasources.length === 0 && window.location.pathname !== "/datasource") {
+        if (_hasHydrated && !dismissed && datasources.length === 0 && window.location.pathname !== "/datasource") {
             router.push("/datasource");
         }
-    }, [datasources.length, router]);
+    }, [datasources.length, router, _hasHydrated]);
 
     const handleDismiss = (e: React.MouseEvent) => {
         e.preventDefault();
