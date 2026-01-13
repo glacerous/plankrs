@@ -208,17 +208,49 @@ function ViewContent() {
         }
     };
 
-    const handleGenerate = () => {
+    const handleGenerate = (e?: React.MouseEvent) => {
         if (!plan || isGenerating) return;
         const inGridCount = Object.keys(plan.selectedClassBySubjectId).length;
         if (inGridCount === 0) {
-            toast.error("Empty Grid", { description: "Select subjects into the grid first." });
+            if (!e?.shiftKey) {
+                toast.error("Empty Grid", { description: "Select subjects into the grid first." });
+            }
             return;
         }
 
+        const isDeterministic = e?.shiftKey === true;
         const effectiveMapping = getEffectiveMapping();
 
-        // Generate with new seed
+        if (isDeterministic) {
+            console.group("%c[REPRO MODE] Running 3x Deterministic Cycles", "background: #700; color: #fff; font-weight: bold; padding: 2px 4px;");
+            const fixedSeed = 12345;
+            const results: number[] = [];
+
+            for (let i = 1; i <= 3; i++) {
+                const { count } = generateVariantsForPlan(plan.id, {
+                    target: 10,
+                    maxAttempts: 10000,
+                    seed: fixedSeed,
+                    freezeSeedMapping: effectiveMapping
+                });
+                results.push(count);
+                console.log(`Cycle ${i} Result: ${count} variants`);
+            }
+
+            const allSame = results.every(v => v === results[0]);
+            if (!allSame) {
+                console.error("NON-DETERMINISM DETECTED!", results);
+            } else {
+                console.log("Determinism check passed for 3 iterations.");
+            }
+            console.groupEnd();
+
+            // Set index for the last run
+            setActiveVariantIndex(plan.id, results[2] > 0 ? 0 : null);
+            return;
+        }
+
+        // Normal Generation with new seed
         const { count, failureSummary, blockerSubjects } = generateVariantsForPlan(plan.id, {
             target: 10,
             maxAttempts: 10000,

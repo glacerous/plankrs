@@ -18,6 +18,15 @@ export interface GeneratorResult {
         hits?: number;
         reason?: string;
     }[];
+    stats?: {
+        totalRecursions: number;
+        restarts: number;
+        totalAttempts: number;
+        maxAttempts: number;
+        seed: number;
+        timeMs: number;
+        budgetExhausted: boolean;
+    };
 }
 
 export function generateRandomValidSchedules(
@@ -48,10 +57,14 @@ export function generateRandomValidSchedules(
     }
 
     // Sort courses by fewest sections first (hardest to satisfy)
+    // Add random tie-break to avoid deterministic dead ends for subjects with same class count
     const frozenIds = new Set(Object.keys(engine.initialPicks ?? {}));
     const sortedCourses = courses
         .filter(c => !frozenIds.has(c.subjectId))
-        .sort((a, b) => a.classes.length - b.classes.length);
+        .sort((a, b) => {
+            if (a.classes.length === b.classes.length) return random() - 0.5;
+            return a.classes.length - b.classes.length;
+        });
 
     const validVariants: ScheduleVariant[] = [];
     const seenKeys = new Set<string>();
@@ -80,9 +93,6 @@ export function generateRandomValidSchedules(
         }
     }
 
-    // If we already have absolute blockers, we can return early or keep moving.
-    // Let's keep moving but prioritize these in return.
-
     function getVariantKey(picks: Record<string, Section>): string {
         return Object.entries(picks)
             .sort(([idA], [idB]) => idA.localeCompare(idB))
@@ -90,13 +100,19 @@ export function generateRandomValidSchedules(
             .join("|");
     }
 
-    let steps = 0;
+    // Perform multiple restarts to improve hit rate and diversification
+    const RESTARTS = 25;
+    let currentRestartAttempts = 0;
+    const attemptsPerRestart = Math.ceil(maxAttempts / RESTARTS);
 
     function backtrack(courseIdx: number, currentPicks: Record<string, Section>) {
-        if (validVariants.length >= target || steps >= maxAttempts) return;
+        totalRecursions++;
+        if (validVariants.length >= target || totalAttempts >= maxAttempts) return;
+        if (currentRestartAttempts >= attemptsPerRestart) return;
 
         if (courseIdx === sortedCourses.length) {
             totalAttempts++;
+            currentRestartAttempts++;
             const fullPicks = { ...currentPicks, ...(engine.initialPicks ?? {}) };
             const variant: ScheduleVariant = { picks: fullPicks };
 
@@ -132,8 +148,8 @@ export function generateRandomValidSchedules(
         let attemptedInThisCourse = 0;
 
         for (const section of shuffledSections) {
-            if (validVariants.length >= target || steps >= maxAttempts) break;
-            steps++;
+            if (validVariants.length >= target || totalAttempts >= maxAttempts) break;
+            if (currentRestartAttempts >= attemptsPerRestart) break;
             attemptedInThisCourse++;
 
             // Early conflict prune
@@ -168,9 +184,33 @@ export function generateRandomValidSchedules(
         }
     }
 
-    backtrack(0, {});
+    const startTime = Date.now();
+    let totalRecursions = 0;
+    let restartCount = 0;
 
-    const result: GeneratorResult = { variants: validVariants };
+    for (let r = 0; r < RESTARTS; r++) {
+        restartCount++;
+        if (validVariants.length >= target || totalAttempts >= maxAttempts) break;
+
+        currentRestartAttempts = 0;
+        backtrack(0, {});
+
+        // Advance RNG so next restart explores different region
+        currentSeed = (currentSeed * 1664525 + 1013904223) % 4294967296;
+    }
+
+    const result: GeneratorResult = {
+        variants: validVariants,
+        stats: {
+            totalRecursions,
+            restarts: restartCount,
+            totalAttempts,
+            maxAttempts,
+            seed,
+            timeMs: Date.now() - startTime,
+            budgetExhausted: totalAttempts >= maxAttempts
+        }
+    };
 
     if (validVariants.length === 0) {
         // Collect failure info

@@ -105,7 +105,7 @@ interface AppStore {
 
 export const useAppStore = create<AppStore>()(
     persist(
-        (set) => ({
+        (set, get): AppStore => ({
             datasources: [],
             plans: [],
             activePlanId: null,
@@ -139,7 +139,7 @@ export const useAppStore = create<AppStore>()(
                     id,
                     createdAt: new Date().toISOString(),
                 };
-                set((state) => ({
+                set((state: AppStore) => ({
                     plans: [newPlan, ...state.plans],
                     activePlanId: id
                 }));
@@ -147,14 +147,14 @@ export const useAppStore = create<AppStore>()(
             },
 
             updatePlan: (id, updates) => {
-                set((state) => ({
-                    plans: state.plans.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+                set((state: AppStore) => ({
+                    plans: state.plans.map((p: Plan) => (p.id === id ? { ...p, ...updates } : p)),
                 }));
             },
 
             deletePlan: (id) => {
-                set((state) => ({
-                    plans: state.plans.filter((p) => p.id !== id),
+                set((state: AppStore) => ({
+                    plans: state.plans.filter((p: Plan) => p.id !== id),
                     activePlanId: state.activePlanId === id ? null : state.activePlanId,
                 }));
             },
@@ -163,165 +163,203 @@ export const useAppStore = create<AppStore>()(
             setActiveDatasourceId: (activeDatasourceId) => set({ activeDatasourceId }),
 
             setRulesForPlan: (planId, rules) => {
-                set((state) => ({
-                    plans: state.plans.map((p) => (p.id === planId ? { ...p, rules } : p)),
+                set((state: AppStore) => ({
+                    plans: state.plans.map((p: Plan) => (p.id === planId ? { ...p, rules } : p)),
                 }));
             },
 
             generateVariantsForPlan: (planId, opts = {}) => {
+                const DEBUG = process.env.NEXT_PUBLIC_DEBUG_GEN === "1" || (typeof window !== "undefined" && (window as any).DEBUG_GEN === true);
+
                 set({ isGenerating: true });
                 let count = 0;
                 let failureSummary: { ruleId: string; hits: number; }[] | undefined;
                 let blockerSubjects: { subjectId: string; subjectName: string; hits?: number; reason?: string }[] | undefined;
 
                 try {
-                    set((state) => {
-                        const plan = state.plans.find((p) => p.id === planId);
-                        if (!plan) return state;
+                    const state = useAppStore.getState();
+                    const plan = state.plans.find((p) => p.id === planId);
+                    if (!plan) return { count: 0 };
 
-                        const datasource = state.datasources.find((ds) => ds.id === plan.datasourceId);
-                        if (!datasource) return state;
+                    const datasource = state.datasources.find((ds) => ds.id === plan.datasourceId);
+                    if (!datasource) return { count: 0 };
 
-                        const rules = (plan.rules ?? []).filter(r => r.enabled);
-                        const validation = validateRules(rules);
-                        if (!validation.ok) {
-                            console.error("Rule validation failed", validation.errors);
-                            return state;
-                        }
+                    const rules = (plan.rules ?? []).filter(r => r.enabled);
+                    const validation = validateRules(rules);
+                    if (!validation.ok) {
+                        console.error("Rule validation failed", validation.errors);
+                        return { count: 0 };
+                    }
 
-                        // 1. Determine which subjects are in the grid
-                        const inGridIds = Object.keys(plan.selectedClassBySubjectId);
-                        if (inGridIds.length === 0) {
-                            return {
-                                plans: state.plans.map((p) =>
-                                    p.id === planId
-                                        ? { ...p, generatedVariants: [], activeVariantIndex: null }
-                                        : p
-                                ),
-                            };
-                        }
+                    // 1. Determine which subjects are in the grid
+                    const inGridIds = Object.keys(plan.selectedClassBySubjectId);
+                    if (inGridIds.length === 0) {
+                        set((state) => ({
+                            plans: state.plans.map((p) =>
+                                p.id === planId
+                                    ? { ...p, generatedVariants: [], activeVariantIndex: null }
+                                    : p
+                            ),
+                        }));
+                        return { count: 0 };
+                    }
 
-                        // 2. Build initialPicks mapping (Frozen Sections)
-                        // Priority: Provided Section mapping (opts.initialPicks) > Provided ID mapping (opts.freezeSeedMapping) > Base plan mapping.
-                        let initialPicks: Record<string, Section> = opts.initialPicks || {};
-                        const freezeSource = opts.freezeSeedMapping || plan.selectedClassBySubjectId;
+                    // 2. Build initialPicks mapping (Frozen Sections)
+                    let initialPicks: Record<string, Section> = opts.initialPicks || {};
+                    const freezeSource = opts.freezeSeedMapping || plan.selectedClassBySubjectId;
 
-                        if (!opts.initialPicks) {
-                            const frozenSet = new Set(plan.frozenSubjectIds ?? []);
-                            for (const subId of inGridIds) {
-                                if (frozenSet.has(subId)) {
-                                    const classId = freezeSource[subId];
-                                    if (!classId) continue;
-                                    const sub = datasource.subjects.find(s => s.subjectId === subId);
-                                    const cls = sub?.classes.find(c => c.classId === classId);
-                                    if (cls) {
-                                        initialPicks[subId] = cls as unknown as Section;
-                                    }
+                    if (!opts.initialPicks) {
+                        const frozenSet = new Set(plan.frozenSubjectIds ?? []);
+                        for (const subId of inGridIds) {
+                            if (frozenSet.has(subId)) {
+                                const classId = freezeSource[subId];
+                                if (!classId) {
+                                    if (DEBUG) console.warn(`[GenDebug] Subject ${subId} is frozen but has no classId in source.`);
+                                    continue;
+                                }
+                                const sub = datasource.subjects.find(s => s.subjectId === subId);
+                                const cls = sub?.classes.find(c => c.classId === classId);
+                                if (cls) {
+                                    initialPicks[subId] = cls as unknown as Section;
+                                } else if (DEBUG) {
+                                    console.warn(`[GenDebug] Class ${classId} for subject ${subId} not found in datasource.`);
                                 }
                             }
                         }
+                    }
 
-                        // 3. Determine mutable subjects (Everything in grid NOT in initialPicks)
-                        const initialPicksIds = new Set(Object.keys(initialPicks));
-                        const mutableIds = inGridIds.filter(id => !initialPicksIds.has(id));
+                    // 3. Determine mutable subjects
+                    const initialPicksIds = new Set(Object.keys(initialPicks));
+                    const mutableIds = inGridIds.filter(id => !initialPicksIds.has(id));
 
-                        // Heuristic 1: Fixed conflict detector
-                        const fixedSubjectIds = Object.keys(initialPicks);
-                        for (let i = 0; i < fixedSubjectIds.length; i++) {
-                            for (let j = i + 1; j < fixedSubjectIds.length; j++) {
-                                const idA = fixedSubjectIds[i];
-                                const idB = fixedSubjectIds[j];
-                                if (checkClassConflict(initialPicks[idA] as any, initialPicks[idB] as any)) {
-                                    const subA = datasource.subjects.find(s => s.subjectId === idA);
-                                    const subB = datasource.subjects.find(s => s.subjectId === idB);
-                                    blockerSubjects = [
-                                        { subjectId: idA, subjectName: subA?.name || idA, reason: "Fixed selection conflict" },
-                                        { subjectId: idB, subjectName: subB?.name || idB, reason: "Fixed selection conflict" }
-                                    ];
-                                    count = 0;
-                                    return state;
-                                }
+                    // Integrity check: overlap
+                    const overlap = mutableIds.filter(id => initialPicksIds.has(id));
+                    if (overlap.length > 0 && DEBUG) {
+                        console.error("[GenDebug] Subject Overlap detected! Subjects are both frozen and mutable:", overlap);
+                    }
+
+                    // Heuristic 1: Fixed conflict detector
+                    const fixedSubjectIds = Object.keys(initialPicks);
+                    for (let i = 0; i < fixedSubjectIds.length; i++) {
+                        for (let j = i + 1; j < fixedSubjectIds.length; j++) {
+                            const idA = fixedSubjectIds[i];
+                            const idB = fixedSubjectIds[j];
+                            if (checkClassConflict(initialPicks[idA] as any, initialPicks[idB] as any)) {
+                                const subA = datasource.subjects.find(s => s.subjectId === idA);
+                                const subB = datasource.subjects.find(s => s.subjectId === idB);
+                                blockerSubjects = [
+                                    { subjectId: idA, subjectName: subA?.name || idA, reason: "Fixed selection conflict" },
+                                    { subjectId: idB, subjectName: subB?.name || idB, reason: "Fixed selection conflict" }
+                                ];
+                                if (DEBUG) console.warn("[GenDebug] Conflicts found in fixed picks:", blockerSubjects);
+                                return { count: 0, blockerSubjects };
                             }
                         }
+                    }
 
-                        if (mutableIds.length === 0) {
-                            // No subjects left to mutate
-                            return {
-                                plans: state.plans.map((p) =>
-                                    p.id === planId
-                                        ? {
-                                            ...p,
-                                            generatedVariants: [p.selectedClassBySubjectId],
-                                            activeVariantIndex: 0,
-                                        }
-                                        : p
-                                ),
-                            };
-                        }
-
-                        const mutableCourses = datasource.subjects.filter((s) =>
-                            mutableIds.includes(s.subjectId)
-                        ) as unknown as Course[];
-
-                        const genResult = generateRandomValidSchedules(
-                            mutableCourses as any,
-                            rules,
-                            {
-                                target: opts.target ?? 10,
-                                maxAttempts: opts.maxAttempts ?? 10000,
-                                seed: opts.seed
-                            },
-                            {
-                                sectionsConflict: checkClassConflict,
-                                initialPicks
-                            } as any
-                        );
-
-                        const variants = genResult.variants;
-                        failureSummary = genResult.failureSummary;
-
-                        if (genResult.blockerSubjects) {
-                            blockerSubjects = genResult.blockerSubjects.map(b => {
-                                const sub = datasource.subjects.find(s => s.subjectId === b.subjectId);
-                                return {
-                                    ...b,
-                                    subjectName: sub?.name || b.subjectId
-                                };
-                            });
-                        }
-
-                        const serializedVariants = variants.map((v: any) => {
-                            const mapping: Record<string, string> = {};
-                            Object.entries(v.picks).forEach(([courseId, section]: [string, any]) => {
-                                mapping[courseId] = (section as any).classId;
-                            });
-                            return mapping;
-                        });
-
-                        count = serializedVariants.length;
-
-                        return {
+                    if (mutableIds.length === 0) {
+                        const directMapping = { ...plan.selectedClassBySubjectId };
+                        set((state) => ({
                             plans: state.plans.map((p) =>
                                 p.id === planId
                                     ? {
                                         ...p,
-                                        generatedVariants: serializedVariants,
-                                        activeVariantIndex: null,
-                                        previewOverrides: {}
+                                        generatedVariants: [directMapping],
+                                        activeVariantIndex: 0,
                                     }
                                     : p
                             ),
-                        };
+                        }));
+                        return { count: 1 };
+                    }
+
+                    const mutableCourses = datasource.subjects.filter((s) =>
+                        mutableIds.includes(s.subjectId)
+                    ) as unknown as Course[];
+
+                    const generationSeed = opts.seed ?? Date.now();
+                    const genResult = generateRandomValidSchedules(
+                        mutableCourses as any,
+                        rules,
+                        {
+                            target: opts.target ?? 10,
+                            maxAttempts: opts.maxAttempts ?? 10000,
+                            seed: generationSeed
+                        },
+                        {
+                            sectionsConflict: checkClassConflict,
+                            initialPicks
+                        } as any
+                    );
+
+                    const variants = genResult.variants;
+                    failureSummary = genResult.failureSummary;
+
+                    if (genResult.blockerSubjects) {
+                        blockerSubjects = genResult.blockerSubjects.map(b => {
+                            const sub = datasource.subjects.find(s => s.subjectId === b.subjectId);
+                            return {
+                                ...b,
+                                subjectName: sub?.name || b.subjectId
+                            };
+                        });
+                    }
+
+                    const serializedVariants = variants.map((v: any) => {
+                        const mapping: Record<string, string> = {};
+                        Object.entries(v.picks).forEach(([courseId, section]: [string, any]) => {
+                            mapping[courseId] = (section as any).classId;
+                        });
+                        return mapping;
                     });
+
+                    count = serializedVariants.length;
+
+                    if (DEBUG) {
+                        console.group(`%c[Generation Report] ${new Date().toLocaleTimeString()}`, "color: #00ff00; font-weight: bold;");
+                        console.log("Input Stats:", {
+                            inGrid: inGridIds.length,
+                            frozen: initialPicksIds.size,
+                            mutable: mutableIds.length,
+                            rules: rules.length,
+                            seed: generationSeed
+                        });
+                        console.log("Frozen Subjects:", Object.keys(initialPicks).map(id => datasource.subjects.find(s => s.subjectId === id)?.name));
+                        if (genResult.stats) {
+                            console.log("Engine Stats:", genResult.stats);
+                        }
+                        console.log("Results:", {
+                            variants: count,
+                            failures: failureSummary?.length || 0,
+                            blockers: blockerSubjects?.length || 0
+                        });
+                        if (count === 0) {
+                            console.log("Failure Reasons:", { failureSummary, blockerSubjects });
+                        }
+                        console.groupEnd();
+                    }
+
+                    set((state) => ({
+                        plans: state.plans.map((p) =>
+                            p.id === planId
+                                ? {
+                                    ...p,
+                                    generatedVariants: serializedVariants,
+                                    activeVariantIndex: null,
+                                    previewOverrides: {}
+                                }
+                                : p
+                        ),
+                    }));
                     return { count, failureSummary, blockerSubjects };
                 } finally {
                     set({ isGenerating: false });
                 }
             },
 
-            setActiveVariantIndex: (planId, index) => {
-                set((state) => ({
-                    plans: state.plans.map((p) => (p.id === planId ? { ...p, activeVariantIndex: index, previewOverrides: {} } : p)),
+            setActiveVariantIndex: (planId: string, index: number | null) => {
+                set((state: AppStore) => ({
+                    plans: state.plans.map((p: Plan) => (p.id === planId ? { ...p, activeVariantIndex: index, previewOverrides: {} } : p)),
                 }));
             },
 
@@ -453,9 +491,9 @@ export const useAppStore = create<AppStore>()(
                 }));
             },
 
-            applyActiveSavedVariantToPlan: (planId) => {
-                set((state) => {
-                    const plan = state.plans.find((p) => p.id === planId);
+            applyActiveSavedVariantToPlan: (planId: string) => {
+                set((state: AppStore) => {
+                    const plan = state.plans.find((p: Plan) => p.id === planId);
                     if (!plan || !plan.activeSavedVariantId || !plan.savedVariants) return state;
 
                     const saved = plan.savedVariants.find((sv) => sv.id === plan.activeSavedVariantId);
@@ -465,7 +503,7 @@ export const useAppStore = create<AppStore>()(
                     const effectiveMapping = { ...saved.mapping, ...plan.previewOverrides };
 
                     return {
-                        plans: state.plans.map((p) =>
+                        plans: state.plans.map((p: Plan) =>
                             p.id === planId
                                 ? {
                                     ...p,
