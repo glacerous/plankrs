@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, X, Clipboard, ExternalLink, GraduationCap, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Clipboard, GraduationCap, ArrowRight, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface Step {
     title: string;
@@ -98,10 +99,11 @@ export function OnboardingTutorial({ currentStep, onStepChange, onDismiss, onCom
 
                 {step.image && (
                     <div className="rounded-xl overflow-hidden border border-border bg-muted/30 aspect-video relative group">
-                        <img
+                        <Image
                             src={step.image}
                             alt="BIMA Reference"
-                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                            fill
+                            className="object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-background/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity">
                             <p className="text-[10px] font-black text-foreground uppercase tracking-widest bg-card/80 px-3 py-1.5 rounded-full border border-border shadow-sm">

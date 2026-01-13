@@ -29,7 +29,7 @@ export function SavedVariants({ plan, datasource, isOpen, onOpenChange }: SavedV
         return () => {
             window.removeEventListener("keydown", handleEsc);
         };
-    }, [isOpen]);
+    }, [isOpen, onOpenChange]);
 
     return (
         <>
