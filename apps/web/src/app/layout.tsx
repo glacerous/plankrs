@@ -22,8 +22,8 @@ export default function RootLayout({
             <body className={`${inter.className} bg-background text-foreground transition-colors duration-200`}>
                 <ThemeProvider
                     attribute="class"
-                    defaultTheme="system"
-                    enableSystem
+                    defaultTheme="dark"
+                    enableSystem={false}
                     disableTransitionOnChange
                 >
                     <div className="flex h-screen overflow-hidden">
