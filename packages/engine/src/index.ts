@@ -1,105 +1,204 @@
 import { Schedule } from "krsplan-engine";
+import { MeetingRaw, ClassScheduleRaw, SubjectRaw } from "./base-types";
+
 export { Schedule };
-
-export interface MeetingRaw {
-  day: string;
-  start: string;
-  end: string;
-  room: string;
-}
-
-export interface ClassScheduleRaw {
-  classId: string;
-  className: string;
-  meetings: MeetingRaw[];
-  lecturers: string[];
-}
-
-export interface SubjectRaw {
-  subjectId: string;
-  code: string;
-  name: string;
-  sks: number;
-  classes: ClassScheduleRaw[];
-}
+export type { MeetingRaw, ClassScheduleRaw, SubjectRaw };
 
 function normalizeTime(timeStr: string): string {
   if (!timeStr) return "00:00";
-  const [hours, minutes] = timeStr.split(":").map(s => s.trim());
+  const parts = timeStr.split(":");
+  if (parts.length === 1) return `${parts[0].padStart(2, '0')}:00`;
+  const hours = parts[0].trim();
+  const minutes = parts[1].trim();
   return `${hours.padStart(2, '0')}:${(minutes || "00").padStart(2, '0')}`;
 }
 
+export interface BimaParseResult {
+  subjects: SubjectRaw[];
+  debug: {
+    formatA: number;
+    formatB: number;
+    unknown: number;
+    lecturerLines: number;
+  };
+}
+
 export function parseBimaMasterText(text: string): SubjectRaw[] {
+  const result = parseBimaMasterWithDebug(text);
+  return result.subjects;
+}
+
+export function parseBimaMasterWithDebug(text: string): BimaParseResult {
   const lines = text.split("\n").filter(l => l.trim().length > 0);
   const subjectsMap: Record<string, SubjectRaw> = {};
+  const debug = { formatA: 0, formatB: 0, unknown: 0, lecturerLines: 0 };
 
   let currentClass: ClassScheduleRaw | null = null;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const columns = line.split("\t");
+    let line = lines[i].trim();
+    if (!line) continue;
 
-    // Check if it's a main record line (usually starts with study program or has many columns)
+    // Strategy 1: Tab or multi-space (Robust Format A)
+    let columns = line.split(/\t|\s{2,}/);
+
+    // Strategy 2: If brittle space-delimited (Format B)
+    if (columns.length < 7 && line.startsWith("SISTEM INFORMASI")) {
+      const parts = line.split(/\s+/);
+      if (parts.length >= 9) {
+        let classIndex = -1;
+        for (let j = 3; j < parts.length; j++) {
+          if (/^SI-[A-Z0-9]+$/.test(parts[j])) {
+            classIndex = j;
+            break;
+          }
+        }
+        if (classIndex !== -1) {
+          columns = [
+            "SISTEM INFORMASI",
+            parts[2], // CODE
+            parts.slice(3, classIndex).join(" "), // NAME
+            parts[classIndex], // CLASS
+            parts[classIndex + 1], // SKS
+            parts[classIndex + 2], // CAPACITY
+            parts[classIndex + 3] + " " + parts[classIndex + 4], // DAY TIME
+            parts[classIndex + 5] // ROOM
+          ];
+        }
+      }
+    }
+
+    // Schema detection
+    // Format A: [0]PRODI [1]CODE [2]NAME [3]SKS [4]CLASS [5]... [6]DAY TIME [7]ROOM
+    // Format B: [0]PRODI [1]CODE [2]NAME [3]CLASS [4]SKS [5]CAPACITY [6]DAY TIME [7]ROOM
+
     if (columns.length >= 7) {
-      const code = columns[1]?.trim();
-      const name = columns[2]?.trim();
-      const sks = parseInt(columns[3]) || 0;
-      const className = columns[4]?.trim();
-      const scheduleStr = columns[6]?.trim(); // "Senin 07:00-09:30"
-      const room = columns[7]?.trim() || "";
+      let code = "";
+      let name = "";
+      let sks = 0;
+      let className = "";
+      let capacity: number | undefined = undefined;
+      let scheduleStr = "";
+      let room = "";
 
-      if (!code || !name) continue;
+      const col3IsNumeric = !isNaN(parseInt(columns[3]));
+      const col4IsNumeric = !isNaN(parseInt(columns[4]));
+      const col3MatchesClass = /^SI-[A-Z0-9]+$/.test(columns[3] || "");
 
-      const subjectId = `${code}-${name}`;
-      if (!subjectsMap[subjectId]) {
-        subjectsMap[subjectId] = {
-          subjectId,
-          code,
-          name,
-          sks,
-          classes: [],
-        };
-      }
-
-      const scheduleParts = scheduleStr.split(" ");
-      const day = scheduleParts[0];
-      const timeRange = scheduleParts[1] || "";
-      const [startRaw, endRaw] = timeRange.split("-");
-
-      const meeting: MeetingRaw = {
-        day,
-        start: normalizeTime(startRaw),
-        end: normalizeTime(endRaw),
-        room,
-      };
-
-      const classId = `${subjectId}-${className}`;
-      let existingClass = subjectsMap[subjectId].classes.find(c => c.classId === classId);
-
-      if (!existingClass) {
-        existingClass = {
-          classId,
-          className,
-          meetings: [meeting],
-          lecturers: [],
-        };
-        subjectsMap[subjectId].classes.push(existingClass);
+      if (col3IsNumeric) {
+        // Format A
+        debug.formatA++;
+        code = columns[1]?.trim();
+        name = columns[2]?.trim();
+        sks = parseInt(columns[3]) || 0;
+        className = columns[4]?.trim();
+        scheduleStr = columns[6]?.trim();
+        room = columns[7]?.trim() || "";
+      } else if (col4IsNumeric && col3MatchesClass) {
+        // Format B
+        debug.formatB++;
+        code = columns[1]?.trim();
+        name = columns[2]?.trim();
+        className = columns[3]?.trim();
+        sks = parseInt(columns[4]) || 0;
+        capacity = parseInt(columns[5]) || undefined;
+        scheduleStr = columns[6]?.trim();
+        room = columns[7]?.trim() || "";
       } else {
-        // Handle multiple meetings for the same class (sometimes listed on separate lines or we detect it)
-        // For now, if we see the same classId, we add the meeting if it's different
-        existingClass.meetings.push(meeting);
+        // Try to find a line that looks like a main record even if it doesn't match the strict schema
+        if (columns[1] && /^\d+$/.test(columns[1])) {
+          debug.unknown++;
+          // Fallback to Format A if it looks like a code
+          code = columns[1].trim();
+          name = columns[2]?.trim();
+          sks = parseInt(columns[3]) || 0;
+          className = columns[4]?.trim();
+          scheduleStr = columns[6]?.trim();
+          room = columns[7]?.trim() || "";
+        } else {
+          // Might be a lecturer line handled below
+        }
       }
-      currentClass = existingClass;
-    } else if (currentClass && columns.length === 1) {
-      // It's likely a lecturer line
-      const lecturer = columns[0].trim();
-      if (lecturer && !currentClass.lecturers.includes(lecturer)) {
+
+      if (code && name) {
+        try {
+          // console.log(`Found subject: ${code} ${name}`);
+          const subjectId = `${code}-${name}`;
+          if (!subjectsMap[subjectId]) {
+            subjectsMap[subjectId] = {
+              subjectId,
+              code,
+              name,
+              sks,
+              classes: [],
+            };
+          }
+
+          const scheduleParts = (scheduleStr || "").split(" ");
+          let day = scheduleParts[0] || "";
+          // Simple normalization for Indonesian days
+          const dayMap: Record<string, string> = {
+            "Senin": "Monday",
+            "Selasa": "Tuesday",
+            "Rabu": "Wednesday",
+            "Kamis": "Thursday",
+            "Jumat": "Friday",
+            "Sabtu": "Saturday",
+            "Minggu": "Sunday"
+          };
+          // If the engine expects Indonesian or we need to normalize to English:
+          // day = dayMap[day] || day; 
+
+          const timeRange = scheduleParts[1] || "";
+          const timeParts = timeRange.split("-");
+          const startRaw = timeParts[0] || "";
+          const endRaw = timeParts[1] || "";
+
+          const meeting: MeetingRaw = {
+            day,
+            start: normalizeTime(startRaw),
+            end: normalizeTime(endRaw),
+            room,
+          };
+
+          const classId = `${subjectId}-${className}`;
+          let existingClass = subjectsMap[subjectId].classes.find(c => c.classId === classId);
+
+          if (!existingClass) {
+            existingClass = {
+              classId,
+              className,
+              meetings: [meeting],
+              lecturers: [],
+              capacity,
+            };
+            subjectsMap[subjectId].classes.push(existingClass);
+          } else {
+            existingClass.meetings.push(meeting);
+          }
+          currentClass = existingClass;
+          continue;
+        } catch (err: any) {
+          console.error(`Error processing subject ${code}-${name} on line ${i}:`, err.message);
+          throw err;
+        }
+      }
+    }
+
+    // Handle lecturer lines or potential multi-line names
+    if (currentClass) {
+      debug.lecturerLines++;
+      const lecturer = line.trim();
+      if (lecturer && !currentClass.lecturers.includes(lecturer) && !lecturer.startsWith("SISTEM INFORMASI")) {
         currentClass.lecturers.push(lecturer);
       }
     }
   }
 
-  return Object.values(subjectsMap);
+  return {
+    subjects: Object.values(subjectsMap),
+    debug
+  };
 }
 
 export function checkMeetingConflict(m1: MeetingRaw, m2: MeetingRaw): boolean {
@@ -121,3 +220,6 @@ export function checkClassConflict(c1: ClassScheduleRaw, c2: ClassScheduleRaw): 
   }
   return false;
 }
+
+export * from "./rules";
+export * from "./generator";

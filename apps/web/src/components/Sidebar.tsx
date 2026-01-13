@@ -1,25 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Database, CalendarDays, Zap, ShieldCheck, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, Database, CalendarDays, Zap, ShieldCheck, Sun, Moon, X } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 export function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const activePlanId = useAppStore((state) => state.activePlanId);
     const plans = useAppStore((state) => state.plans);
+    const datasources = useAppStore((state) => state.datasources);
     const activePlan = plans.find(p => p.id === activePlanId);
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const [isDismissed, setIsDismissed] = useState(true); // Default to true until checked
 
-    // Prevent hydration mismatch
+    const showOnboarding = mounted && !isDismissed && datasources.length === 0;
+
+    // Initial check and auto-nav
     useEffect(() => {
         setMounted(true);
-    }, []);
+        const dismissed = localStorage.getItem("krs_onboard_ds_dismissed") === "1";
+        setIsDismissed(dismissed);
+
+        if (!dismissed && datasources.length === 0 && window.location.pathname !== "/datasource") {
+            router.push("/datasource");
+        }
+    }, [datasources.length, router]);
+
+    const handleDismiss = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        localStorage.setItem("krs_onboard_ds_dismissed", "1");
+        setIsDismissed(true);
+    };
 
     const navItems = [
         { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -71,13 +89,38 @@ export function Sidebar() {
                                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-soft font-medium text-[13px] relative group",
                                 isActive
                                     ? "text-primary bg-primary/5"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                item.name === "Datasources" && showOnboarding && "bg-primary/5 animate-glow border-primary/50"
                             )}
                         >
                             <Icon className={cn("w-4 h-4 transition-soft", isActive ? "text-primary" : "group-hover:text-foreground")} />
                             {item.name}
                             {isActive && (
                                 <div className="absolute left-0 w-1 h-5 bg-primary rounded-r-full" />
+                            )}
+
+                            {item.name === "Datasources" && showOnboarding && (
+                                <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 z-[100] animate-in slide-in-from-left-2 duration-300">
+                                    <div className="bg-primary text-primary-foreground px-5 py-3 rounded-2xl shadow-[0_0_40px_rgba(132,204,22,0.4)] relative w-60 border border-white/20">
+                                        {/* Tooltip Arrow */}
+                                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-r-primary" />
+
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div className="space-y-0.5">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-white/50 leading-none">Phase 1</p>
+                                                <p className="text-[11px] font-bold leading-relaxed">
+                                                    CREATE DATASOURCE FIRST
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={handleDismiss}
+                                                className="hover:bg-white/10 p-1 rounded-full transition-colors -mr-1 -mt-1"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </Link>
                     );

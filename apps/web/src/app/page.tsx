@@ -5,9 +5,28 @@ import { Plus, Calendar, Settings2, Trash2, ArrowRight, Zap, FolderDot } from "l
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
 export default function HomePage() {
-    const { plans, activePlanId, setActivePlanId, deletePlan } = useAppStore();
+    const { plans, activePlanId, setActivePlanId, deletePlan, datasources } = useAppStore();
+    const [mounted, setMounted] = useState(false);
+    const [isDismissed, setIsDismissed] = useState(false);
+    const [onboardStep, setOnboardStep] = useState(0);
+
+    useEffect(() => {
+        setMounted(true);
+        setIsDismissed(localStorage.getItem("krs_onboard_ds_dismissed") === "1");
+        setOnboardStep(parseInt(localStorage.getItem("krs_onboard_step") || "0"));
+    }, []);
+
+    const showPlanOnboarding = mounted && !isDismissed && plans.length === 0 && datasources.length > 0;
+
+    const handleDismiss = (e: React.MouseEvent) => {
+        e.preventDefault();
+        localStorage.setItem("krs_onboard_ds_dismissed", "1");
+        setIsDismissed(true);
+    };
 
     const handleSetActive = (id: string, name: string) => {
         setActivePlanId(id);
@@ -29,13 +48,42 @@ export default function HomePage() {
                     <p className="text-sm text-muted-foreground font-medium">Manage and optimize your academic blueprints.</p>
                 </div>
 
-                <Link
-                    href="/plan/create"
-                    className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-black text-[12px] uppercase tracking-wider shadow-sm transition-soft hover:bg-primary/90 active:scale-95 group"
-                >
-                    <Plus className="w-4 h-4 transition-soft group-hover:rotate-90" />
-                    New Plan
-                </Link>
+                <div className="relative">
+                    <Link
+                        href="/plan/create"
+                        className={cn(
+                            "flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-black text-[12px] uppercase tracking-wider shadow-sm transition-soft hover:bg-primary/90 active:scale-95 group",
+                            showPlanOnboarding && "animate-glow"
+                        )}
+                    >
+                        <Plus className="w-4 h-4 transition-soft group-hover:rotate-90" />
+                        New Plan
+                    </Link>
+
+                    {showPlanOnboarding && (
+                        <div className="absolute right-0 top-full mt-4 z-[100] animate-in slide-in-from-top-2 duration-300">
+                            <div className="bg-primary text-primary-foreground px-5 py-3 rounded-2xl shadow-[0_0_40px_rgba(132,204,22,0.4)] relative w-60 border border-white/20">
+                                {/* Tooltip Arrow */}
+                                <div className="absolute bottom-full right-10 border-8 border-transparent border-b-primary" />
+
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="space-y-0.5">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-white/50 leading-none">Step 8</p>
+                                        <p className="text-[11px] font-bold leading-relaxed">
+                                            NOW CREATE YOUR FIRST PLAN
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleDismiss}
+                                        className="hover:bg-white/10 p-1 rounded-full transition-colors -mr-1 -mt-1"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </header>
 
             <section className="space-y-6">

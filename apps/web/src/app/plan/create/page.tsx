@@ -1,20 +1,25 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useAppStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Database, Search, CheckCircle, ListFilter, Layers, BookCheck } from "lucide-react";
+import { ChevronRight, Database, Search, CheckCircle, ListFilter, Layers, BookCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { validateBlueprint } from "@/utils/validation";
 
 export default function CreatePlanPage() {
     const router = useRouter();
     const { datasources, addPlan } = useAppStore();
 
     const [name, setName] = useState("");
+    const [isNameTouched, setIsNameTouched] = useState(false);
+    const nameInputRef = useRef<HTMLInputElement>(null);
     const [selectedDsId, setSelectedDsId] = useState("");
     const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
+
+    const nameValidation = useMemo(() => validateBlueprint({ name }), [name]);
 
     const selectedDs = useMemo(() =>
         datasources.find(d => d.id === selectedDsId),
@@ -43,8 +48,19 @@ export default function CreatePlanPage() {
     };
 
     const handleCreate = () => {
-        if (!name || !selectedDsId || selectedSubjectIds.length === 0) {
-            toast.error("Process Aborted", { description: "Name, source, and subjects are required." });
+        const validation = validateBlueprint({ name });
+        if (!validation.ok) {
+            toast.error("Process Aborted", {
+                description: validation.errors[0].message,
+                id: "blueprint-val-error"
+            });
+            setIsNameTouched(true);
+            nameInputRef.current?.focus();
+            return;
+        }
+
+        if (!selectedDsId || selectedSubjectIds.length === 0) {
+            toast.error("Process Aborted", { description: "Source and subjects are required." });
             return;
         }
 
@@ -78,12 +94,30 @@ export default function CreatePlanPage() {
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Identity</label>
                             <input
+                                ref={nameInputRef}
                                 type="text"
                                 placeholder="Semester Blueprint Name"
-                                className="w-full bg-background border border-border px-4 py-2.5 rounded-lg text-[13px] font-medium focus:ring-1 focus:ring-primary outline-none transition-soft"
+                                className={cn(
+                                    "w-full bg-background border px-4 py-2.5 rounded-lg text-[13px] font-medium outline-none transition-soft",
+                                    name ? "text-foreground" : "text-foreground/50",
+                                    "placeholder:text-muted-foreground/40",
+                                    "focus:text-foreground focus:ring-1 focus:ring-primary",
+                                    isNameTouched && !nameValidation.ok
+                                        ? "border-destructive ring-destructive/20 bg-destructive/5"
+                                        : "border-border"
+                                )}
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => {
+                                    setName(e.target.value);
+                                    if (!isNameTouched) setIsNameTouched(true);
+                                }}
+                                onBlur={() => setIsNameTouched(true)}
                             />
+                            {isNameTouched && !nameValidation.ok && (
+                                <p className="text-[10px] font-bold text-destructive uppercase tracking-widest flex items-center gap-1.5 ml-1 animate-in slide-in-from-top-1 duration-200">
+                                    <AlertCircle className="w-3 h-3" /> {nameValidation.errors[0].message}
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -130,7 +164,7 @@ export default function CreatePlanPage() {
 
                     <button
                         onClick={handleCreate}
-                        disabled={!name || !selectedDsId || selectedSubjectIds.length === 0 || totalSks > 24}
+                        disabled={!nameValidation.ok || !selectedDsId || selectedSubjectIds.length === 0 || totalSks > 24}
                         className="w-full bg-primary hover:bg-primary/90 disabled:opacity-20 text-primary-foreground p-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-soft shadow-lg shadow-primary/10 flex items-center justify-center gap-2 active:scale-95 group overflow-hidden"
                     >
                         Initialize

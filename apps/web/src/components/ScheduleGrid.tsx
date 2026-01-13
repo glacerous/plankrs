@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, MapPin, Maximize2, Minimize2, ZoomIn, AlertTriangle, Zap, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Clock, MapPin, Maximize2, Minimize2, ZoomIn, AlertTriangle, Zap, User, Snowflake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Meeting } from "@/lib/store";
 
@@ -11,12 +11,23 @@ const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 07:00 - 19:00
 interface ScheduleGridProps {
     selectedClasses: any[];
     conflicts: Record<string, boolean>;
+    frozenSubjectIds?: string[];
+    onToggleFreeze?: (subjectId: string) => void;
+    onBlockClick?: (subjectId: string) => void;
     compact?: boolean;
 }
 
-export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: ScheduleGridProps) {
+export function ScheduleGrid({ selectedClasses, conflicts, frozenSubjectIds = [], onToggleFreeze, onBlockClick, compact = false }: ScheduleGridProps) {
     const [rowHeight, setRowHeight] = useState(compact ? 50 : 65);
+    const [pulsingSubject, setPulsingSubject] = useState<string | null>(null);
+    const [pulse, setPulse] = useState(0);
     const totalHeight = HOURS.length * rowHeight;
+
+    // Trigger grid pulse when selectedClasses change
+    const signature = JSON.stringify(selectedClasses.map(c => c?.classId));
+    useEffect(() => {
+        setPulse(p => p + 1);
+    }, [signature]);
 
     const getPosition = (meeting: Meeting) => {
         const dayIndex = DAYS.indexOf(meeting.day);
@@ -108,7 +119,8 @@ export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: Sc
 
                     {/* Overlays */}
                     <div
-                        className="absolute inset-0 pointer-events-none transition-soft"
+                        key={pulse}
+                        className="absolute inset-0 pointer-events-none transition-all duration-150 ease-out animate-in fade-in-90 zoom-in-[0.995]"
                         style={{ left: compact ? "48px" : "64px" }}
                     >
                         <div className="relative h-full flex">
@@ -122,25 +134,70 @@ export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: Sc
                                                 const pos = getPosition(m);
                                                 if (!pos) return null;
                                                 const isConflicting = conflicts[cls.classId];
+                                                const isFrozen = frozenSubjectIds.includes(cls.subjectId);
+                                                const isPulsing = pulsingSubject === cls.subjectId;
 
                                                 return (
                                                     <div
                                                         key={`${cls.classId}-${mIdx}`}
+                                                        onClick={() => onBlockClick?.(cls.subjectId)}
                                                         className={cn(
-                                                            "absolute left-[3px] right-[3px] rounded-md border transition-soft overflow-hidden flex flex-col pointer-events-auto group/block realistic-shadow",
+                                                            "absolute left-[3px] right-[3px] rounded-md border transition-soft overflow-hidden flex flex-col pointer-events-auto group/block realistic-shadow cursor-pointer",
                                                             isConflicting
                                                                 ? "bg-destructive/15 border-destructive shadow-lg shadow-destructive/10 z-20"
-                                                                : "bg-card border-border/80 hover:border-primary/50 hover:bg-muted/30 z-10 hover:z-30 hover:-translate-y-0.5",
+                                                                : isFrozen
+                                                                    ? "bg-card border-border/80 z-10 hover:z-30 hover:-translate-y-0.5"
+                                                                    : "bg-card border-border/80 hover:border-primary/50 hover:bg-muted/30 z-10 hover:z-30 hover:-translate-y-0.5",
                                                             compact ? "p-1.5" : "p-2.5"
                                                         )}
                                                         style={{ top: `${pos.top + 2}px`, height: `${pos.height - 4}px` }}
                                                     >
-                                                        {/* Simple color indicator strip */}
-                                                        {!isConflicting && (
-                                                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/30 group-hover/block:bg-primary transition-colors" />
+                                                        {/* Structural Gradient Edge for Frozen (Lab-grade) */}
+                                                        {isFrozen && !isConflicting && (
+                                                            <div
+                                                                className="absolute inset-0 pointer-events-none rounded-[inherit] border-[1.5px] border-transparent"
+                                                                style={{
+                                                                    background: "linear-gradient(to bottom right, rgba(34, 211, 238, 0.6), rgba(56, 189, 248, 0.5), rgba(59, 130, 246, 0.6)) border-box",
+                                                                    WebkitMask: "linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)",
+                                                                    WebkitMaskComposite: "destination-out",
+                                                                    maskComposite: "exclude"
+                                                                }}
+                                                            />
                                                         )}
-                                                        {isConflicting && (
+
+                                                        {/* Freeze Toggle Button (Hover-only) */}
+                                                        {onToggleFreeze && (
+                                                            <div className="absolute top-1.5 right-1.5 z-50">
+                                                                {isPulsing && (
+                                                                    <div className="absolute inset-0 rounded-md bg-cyan-400 animate-ping opacity-50" />
+                                                                )}
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onToggleFreeze(cls.subjectId);
+                                                                        setPulsingSubject(cls.subjectId);
+                                                                        setTimeout(() => setPulsingSubject(null), 250);
+                                                                    }}
+                                                                    className={cn(
+                                                                        "relative p-1 rounded-md border transition-soft",
+                                                                        "bg-card shadow-sm hover:scale-110 active:scale-90",
+                                                                        isFrozen
+                                                                            ? "border-cyan-200/50 text-cyan-500 opacity-100"
+                                                                            : "border-border text-muted-foreground/30 hover:text-foreground opacity-0 group-hover/block:opacity-100"
+                                                                    )}
+                                                                >
+                                                                    <Snowflake className={cn(compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5")} fill={isFrozen ? "currentColor" : "none"} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Accent strip */}
+                                                        {isConflicting ? (
                                                             <div className="absolute top-0 left-0 right-0 h-0.5 bg-destructive" />
+                                                        ) : isFrozen ? (
+                                                            <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-cyan-400/40" />
+                                                        ) : (
+                                                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/30 group-hover/block:bg-primary transition-colors" />
                                                         )}
 
                                                         <div className="flex-1 min-w-0 space-y-0.5 mt-0.5">
@@ -185,6 +242,10 @@ export function ScheduleGrid({ selectedClasses, conflicts, compact = false }: Sc
                         </div>
                     </div>
                 </div>
+            </div>
+            {/* Watermark for Export */}
+            <div className="absolute bottom-4 right-6 pointer-events-none opacity-30 z-[60]">
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/40">Generated by KRSlab</span>
             </div>
         </div>
     );

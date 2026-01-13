@@ -1,18 +1,48 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useAppStore, Subject } from "@/lib/store";
-import { parseBimaMasterText } from "@krs/engine";
-import { Database, FileCode, Clipboard, Trash2, ChevronDown, ChevronUp, Zap, Sparkles } from "lucide-react";
+import { parseBimaMasterText, parseBimaMasterWithDebug } from "@krs/engine";
+import { Database, FileCode, Clipboard, Trash2, ChevronDown, ChevronUp, Zap, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { validateDatasource } from "@/utils/validation";
+import { OnboardingTutorial } from "@/components/OnboardingTutorial";
+import { useRouter } from "next/navigation";
 
 export default function DatasourcePage() {
-    const { datasources, addDatasource, deleteDatasource } = useAppStore();
+    const { datasources, addDatasource, deleteDatasource, plans, activePlanId } = useAppStore();
+    const router = useRouter();
+
     const [name, setName] = useState("");
+    const [isNameTouched, setIsNameTouched] = useState(false);
+    const nameInputRef = useRef<HTMLInputElement>(null);
     const [rawText, setRawText] = useState("");
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [parsedData, setParsedData] = useState<Subject[]>([]);
+    const [debugInfo, setDebugInfo] = useState<{ formatA: number, formatB: number } | null>(null);
+
+    const [mounted, setMounted] = useState(false);
+    const [tutorialStep, setTutorialStep] = useState(0);
+    const [isDismissed, setIsDismissed] = useState(true);
+
+    const showTutorial = mounted && !isDismissed && datasources.length === 0;
+
+    useEffect(() => {
+        setMounted(true);
+        const step = parseInt(localStorage.getItem("krs_onboard_step") || "0");
+        const dismissed = localStorage.getItem("krs_onboard_ds_dismissed") === "1";
+        setTutorialStep(step);
+        setIsDismissed(dismissed);
+    }, [datasources.length]);
+
+    useEffect(() => {
+        if (mounted) {
+            localStorage.setItem("krs_onboard_step", tutorialStep.toString());
+        }
+    }, [tutorialStep, mounted]);
+
+    const nameValidation = useMemo(() => validateDatasource({ name }), [name]);
 
     const summary = useMemo(() => {
         if (parsedData.length === 0) return null;
@@ -28,28 +58,49 @@ export default function DatasourcePage() {
                 toast.error("Process Failed", { description: "Input buffer is empty." });
                 return;
             }
-            const subjects = parseBimaMasterText(rawText);
+            const result = parseBimaMasterWithDebug(rawText);
+            const subjects = result.subjects;
+
             if (subjects.length === 0) {
                 toast.error("Format Error", { description: "Unrecognized data structure." });
                 return;
             }
             setParsedData(subjects);
+            setDebugInfo(result.debug);
             toast.success("Sync Successful", { description: `${subjects.length} subjects extracted.` });
+
+            // Advance tutorial if on sync step (Step 6)
+            if (showTutorial && tutorialStep === 5) {
+                setTutorialStep(6);
+            }
         } catch (error) {
             toast.error("System Exception", { description: "The engine failed to process the input." });
         }
     };
 
     const handleSave = () => {
-        if (!name.trim()) {
-            toast.error("Missing Input", { description: "Please enter a name for this dataset." });
+        const validation = validateDatasource({ name });
+        if (!validation.ok) {
+            toast.error("Missing required field", {
+                description: validation.errors[0].message,
+                id: "datasource-val-error"
+            });
+            setIsNameTouched(true);
+            nameInputRef.current?.focus();
             return;
         }
         addDatasource(name, parsedData);
         toast.success("Dataset Deployed", { description: `"${name}" added to library.` });
         setRawText("");
         setName("");
+        setIsNameTouched(false);
         setParsedData([]);
+        setDebugInfo(null);
+
+        // Advance to step 8 (Create Plan)
+        if (showTutorial) {
+            setTutorialStep(7);
+        }
     };
 
     const handlePaste = async () => {
@@ -64,9 +115,27 @@ export default function DatasourcePage() {
 
     return (
         <div className="p-8 max-w-5xl mx-auto space-y-10 animate-in fade-in duration-500">
-            <header className="space-y-1 pb-6 border-b border-border/50">
-                <h1 className="text-2xl font-black tracking-tight text-foreground">Datasources</h1>
-                <p className="text-sm text-muted-foreground font-medium">Import academic data from BIMA infrastructure.</p>
+            <header className="flex justify-between items-center gap-6 pb-6 border-b border-border/50 relative">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-black tracking-tight text-foreground">Datasources</h1>
+                    <p className="text-sm text-muted-foreground font-medium">Import academic data from BIMA infrastructure.</p>
+                </div>
+
+                {showTutorial && (
+                    <div className="absolute top-0 right-0 max-w-sm">
+                        <OnboardingTutorial
+                            currentStep={tutorialStep}
+                            onStepChange={setTutorialStep}
+                            onDismiss={() => {
+                                localStorage.setItem("krs_onboard_ds_dismissed", "1");
+                                setIsDismissed(true);
+                            }}
+                            onComplete={() => {
+                                router.push("/");
+                            }}
+                        />
+                    </div>
+                )}
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -74,13 +143,28 @@ export default function DatasourcePage() {
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-6 transition-colors">
                         <div className="flex flex-col md:flex-row gap-4">
-                            <input
-                                type="text"
-                                placeholder="Datasource Identity (e.g. 2024 Semester 1)"
-                                className="flex-1 bg-muted/30 border border-border px-4 py-2.5 rounded-lg text-sm font-medium focus:ring-1 focus:ring-primary focus:bg-background outline-none transition-soft placeholder:text-muted-foreground/30"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
+                            <div className="flex-1 space-y-2">
+                                <input
+                                    ref={nameInputRef}
+                                    type="text"
+                                    placeholder="Datasource Identity (e.g. 2024 Semester 1)"
+                                    className={cn(
+                                        "w-full bg-muted/30 border px-4 py-2.5 rounded-lg text-sm font-medium focus:ring-1 focus:ring-primary focus:bg-background outline-none transition-soft placeholder:text-muted-foreground/30",
+                                        isNameTouched && !nameValidation.ok ? "border-destructive ring-destructive/20 bg-destructive/5" : "border-border"
+                                    )}
+                                    value={name}
+                                    onChange={(e) => {
+                                        setName(e.target.value);
+                                        if (!isNameTouched) setIsNameTouched(true);
+                                    }}
+                                    onBlur={() => setIsNameTouched(true)}
+                                />
+                                {isNameTouched && !nameValidation.ok && (
+                                    <p className="text-[10px] font-bold text-destructive uppercase tracking-widest flex items-center gap-1.5 ml-1 animate-in slide-in-from-top-1 duration-200">
+                                        <AlertCircle className="w-3 h-3" /> {nameValidation.errors[0].message}
+                                    </p>
+                                )}
+                            </div>
                             <button
                                 onClick={handlePaste}
                                 className="px-4 py-2.5 bg-muted text-muted-foreground hover:bg-muted-foreground/10 h-10 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-soft border border-border flex items-center justify-center gap-2 shrink-0"
@@ -96,7 +180,10 @@ export default function DatasourcePage() {
                                 value={rawText}
                                 onChange={(e) => {
                                     setRawText(e.target.value);
-                                    if (parsedData.length > 0) setParsedData([]);
+                                    if (parsedData.length > 0) {
+                                        setParsedData([]);
+                                        setDebugInfo(null);
+                                    }
                                 }}
                             />
                             {rawText && (
@@ -112,8 +199,16 @@ export default function DatasourcePage() {
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                             <div className="flex gap-2.5 items-center">
                                 {summary ? (
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-widest border border-primary/20">
-                                        <Zap className="w-3 h-3" /> {summary.subjects} Subjects
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-widest border border-primary/20">
+                                            <Zap className="w-3 h-3" /> {summary.subjects} Subjects
+                                        </div>
+                                        {debugInfo && (debugInfo.formatA > 0 || debugInfo.formatB > 0) && (
+                                            <div className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground/50 uppercase tracking-tighter">
+                                                {debugInfo.formatA > 0 && <span>Type A: {debugInfo.formatA}</span>}
+                                                {debugInfo.formatB > 0 && <span>Type B: {debugInfo.formatB}</span>}
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest italic ml-2">Standby</span>
