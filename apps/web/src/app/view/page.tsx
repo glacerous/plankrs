@@ -221,7 +221,7 @@ function ViewContent() {
         // Generate with new seed
         const { count, failureSummary, blockerSubjects } = generateVariantsForPlan(plan.id, {
             target: 10,
-            maxAttempts: 1000,
+            maxAttempts: 10000,
             seed: Date.now(),
             freezeSeedMapping: effectiveMapping
         });

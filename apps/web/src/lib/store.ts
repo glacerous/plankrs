@@ -268,7 +268,7 @@ export const useAppStore = create<AppStore>()(
                             rules,
                             {
                                 target: opts.target ?? 10,
-                                maxAttempts: opts.maxAttempts ?? 1000,
+                                maxAttempts: opts.maxAttempts ?? 10000,
                                 seed: opts.seed
                             },
                             {

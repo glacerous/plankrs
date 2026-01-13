@@ -90,8 +90,10 @@ export function generateRandomValidSchedules(
             .join("|");
     }
 
+    let steps = 0;
+
     function backtrack(courseIdx: number, currentPicks: Record<string, Section>) {
-        if (validVariants.length >= target || totalAttempts >= maxAttempts) return;
+        if (validVariants.length >= target || steps >= maxAttempts) return;
 
         if (courseIdx === sortedCourses.length) {
             totalAttempts++;
@@ -126,12 +128,13 @@ export function generateRandomValidSchedules(
 
         const shuffledSections = shuffle(course.classes);
 
-        let attemptedSections = 0;
         let fitSections = 0;
+        let attemptedInThisCourse = 0;
 
         for (const section of shuffledSections) {
-            if (validVariants.length >= target || totalAttempts >= maxAttempts) break;
-            attemptedSections++;
+            if (validVariants.length >= target || steps >= maxAttempts) break;
+            steps++;
+            attemptedInThisCourse++;
 
             // Early conflict prune
             let hasConflict = false;
@@ -160,16 +163,12 @@ export function generateRandomValidSchedules(
             }
         }
 
-        if (fitSections === 0 && attemptedSections > 0) {
+        if (fitSections === 0 && attemptedInThisCourse > 0) {
             deadEndCounts.set(course.subjectId, (deadEndCounts.get(course.subjectId) || 0) + 1);
         }
     }
 
-    let rootRuns = 0;
-    while (validVariants.length < target && rootRuns < maxAttempts) {
-        rootRuns++;
-        backtrack(0, {});
-    }
+    backtrack(0, {});
 
     const result: GeneratorResult = { variants: validVariants };
 
