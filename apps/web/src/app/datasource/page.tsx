@@ -79,13 +79,13 @@ export default function DatasourcePage() {
     };
 
     const handleSave = () => {
+        setIsNameTouched(true);
         const validation = validateDatasource({ name });
         if (!validation.ok) {
             toast.error("Missing required field", {
                 description: validation.errors[0].message,
                 id: "datasource-val-error"
             });
-            setIsNameTouched(true);
             nameInputRef.current?.focus();
             return;
         }
@@ -224,7 +224,7 @@ export default function DatasourcePage() {
                                 </button>
                                 <button
                                     onClick={handleSave}
-                                    disabled={parsedData.length === 0 || !name.trim()}
+                                    disabled={parsedData.length === 0}
                                     className="flex-1 sm:flex-none px-8 py-2.5 bg-primary text-primary-foreground font-bold rounded-lg text-[11px] uppercase tracking-widest transition-soft disabled:opacity-30 hover:scale-[1.02] active:scale-95 shadow-sm"
                                 >
                                     Deploy

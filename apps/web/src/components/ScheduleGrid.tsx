@@ -6,7 +6,11 @@ import { cn } from "@/lib/utils";
 import { Meeting } from "@/lib/store";
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 07:00 - 19:00
+const SLOTS = Array.from({ length: 13 * 2 }, (_, i) => {
+    const h = Math.floor(i / 2) + 7;
+    const m = (i % 2) * 30;
+    return { h, m, isMajor: m === 0 };
+});
 
 interface ScheduleGridProps {
     selectedClasses: any[];
@@ -21,7 +25,7 @@ export function ScheduleGrid({ selectedClasses, conflicts, frozenSubjectIds = []
     const [rowHeight, setRowHeight] = useState(compact ? 50 : 65);
     const [pulsingSubject, setPulsingSubject] = useState<string | null>(null);
     const [pulse, setPulse] = useState(0);
-    const totalHeight = HOURS.length * rowHeight;
+    const totalHeight = (SLOTS.length / 2) * rowHeight;
 
     // Trigger grid pulse when selectedClasses change
     const signature = JSON.stringify(selectedClasses.map(c => c?.classId));
@@ -94,28 +98,65 @@ export function ScheduleGrid({ selectedClasses, conflicts, frozenSubjectIds = []
             </div>
 
             {/* Grid Area */}
-            <div className="flex-1 relative overflow-y-auto no-scrollbar">
+            <div className="flex-1 relative overflow-y-auto no-scrollbar bg-muted/[0.03]">
                 <div
                     className="relative flex"
                     style={{ height: `${totalHeight}px`, minWidth: "100%" }}
                 >
-                    {/* Time Column - Sticky */}
-                    <div className={cn("w-16 bg-muted/10 border-r border-border shrink-0 h-full transition-colors sticky left-0 z-30", compact && "w-12")}>
-                        {HOURS.map(hour => (
-                            <div key={hour} style={{ height: `${rowHeight}px` }} className="border-b border-border/40 p-1.5 text-right pr-3 group/hour relative bg-card/80 backdrop-blur-sm">
-                                <span className="text-[10px] font-bold text-foreground/50 transition-soft group-hover/hour:text-primary leading-none">{hour.toString().padStart(2, '0')}:00</span>
+                    {/* Grid Background & Interactive Rows */}
+                    <div className="absolute inset-0 flex flex-col pointer-events-none">
+                        {SLOTS.map((slot, idx) => (
+                            <div
+                                key={`${slot.h}-${slot.m}`}
+                                style={{ height: `${rowHeight / 2}px` }}
+                                className={cn(
+                                    "w-full relative transition-colors pointer-events-auto group/row",
+                                    "dark:slot-major-dark dark:slot-minor-dark light:slot-major-light light:slot-minor-light",
+                                    slot.isMajor
+                                        ? "bg-foreground/[0.04] dark:bg-foreground/[0.04] border-b-2 border-border/80 dark:border-border/80"
+                                        : "bg-foreground/[0.015] dark:bg-foreground/[0.02] border-b border-border/30 dark:border-border/30"
+                                )}
+                            >
+                                {/* Row Hover Glow */}
+                                <div className="absolute inset-0 bg-primary/[0.04] opacity-0 group-hover/row:opacity-100 transition-opacity" />
                             </div>
                         ))}
                     </div>
 
-                    {/* Columns & Lines */}
-                    {DAYS.map((day) => (
-                        <div key={day} className="flex-1 relative border-r last:border-r-0 border-border/40 h-full">
-                            {HOURS.map(hour => (
-                                <div key={hour} style={{ height: `${rowHeight}px` }} className="border-b border-border/40" />
-                            ))}
-                        </div>
-                    ))}
+                    {/* Time Column - Sticky */}
+                    <div className={cn(
+                        "w-16 border-r border-border shrink-0 h-full transition-colors sticky left-0 z-40 bg-card/95 backdrop-blur-md",
+                        "shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.8)]",
+                        compact && "w-12"
+                    )}>
+                        {SLOTS.map((slot, idx) => (
+                            <div
+                                key={`${slot.h}-${slot.m}`}
+                                style={{ height: `${rowHeight / 2}px` }}
+                                className={cn(
+                                    "p-1.5 text-right pr-4 group/hour relative flex flex-col justify-center",
+                                    slot.isMajor ? "opacity-100" : "opacity-30"
+                                )}
+                            >
+                                <span className={cn(
+                                    "font-black tracking-tight tabular-nums transition-soft group-hover/hour:text-primary leading-none text-foreground",
+                                    slot.isMajor ? (compact ? "text-[10px]" : "text-[13px]") : (compact ? "text-[7px]" : "text-[8px]")
+                                )}>
+                                    {slot.h.toString().padStart(2, '0')}:{slot.m.toString().padStart(2, '0')}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Day Column Verticals & Tints */}
+                    <div className="flex-1 flex pointer-events-none">
+                        {DAYS.map((day, idx) => (
+                            <div key={day} className={cn(
+                                "flex-1 border-r last:border-r-0 border-border/40",
+                                idx % 2 === 0 ? "bg-foreground/[0.005] dark:bg-foreground/[0.01]" : "bg-transparent"
+                            )} />
+                        ))}
+                    </div>
 
                     {/* Overlays */}
                     <div
@@ -146,8 +187,8 @@ export function ScheduleGrid({ selectedClasses, conflicts, frozenSubjectIds = []
                                                             isConflicting
                                                                 ? "bg-destructive/15 border-destructive shadow-lg shadow-destructive/10 z-20"
                                                                 : isFrozen
-                                                                    ? "bg-card border-border/80 z-10 hover:z-30 hover:-translate-y-0.5"
-                                                                    : "bg-card border-border/80 hover:border-primary/50 hover:bg-muted/30 z-10 hover:z-30 hover:-translate-y-0.5",
+                                                                    ? "bg-card border-border/80 dark:border-border/80 z-10 hover:z-30 hover:-translate-y-0.5"
+                                                                    : "bg-card border-border/50 dark:border-border/80 hover:border-primary/50 hover:bg-muted/30 dark:hover:bg-muted/30 z-10 hover:z-30 hover:-translate-y-0.5",
                                                             compact ? "p-1.5" : "p-2.5"
                                                         )}
                                                         style={{ top: `${pos.top + 2}px`, height: `${pos.height - 4}px` }}
@@ -200,35 +241,44 @@ export function ScheduleGrid({ selectedClasses, conflicts, frozenSubjectIds = []
                                                             <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/30 group-hover/block:bg-primary transition-colors" />
                                                         )}
 
-                                                        <div className="flex-1 min-w-0 space-y-0.5 mt-0.5">
+                                                        <div className="flex-1 min-w-0 flex flex-col mt-0.5">
                                                             <div className="flex items-center justify-between">
-                                                                <span className={cn("font-black tracking-[0.05em] text-foreground/40 uppercase truncate", compact ? "text-[7px]" : "text-[8px]")}>
+                                                                <span className={cn("font-black tracking-[0.05em] text-foreground/30 uppercase truncate", compact ? "text-[7px]" : "text-[8px]")}>
                                                                     {cls.subjectCode}
                                                                 </span>
                                                                 {isConflicting && <AlertTriangle className={cn("animate-pulse text-destructive", compact ? "w-2.5 h-2.5" : "w-3 h-3")} />}
                                                             </div>
-                                                            <h4 className={cn("font-extrabold leading-tight transition-soft text-foreground", compact ? "text-[9px]" : "text-[12px]")}>
+                                                            <h4 className={cn("font-extrabold leading-tight transition-soft text-foreground truncate", compact ? "text-[9px]" : "text-[12px]")}>
                                                                 {cls.subjectName}
                                                             </h4>
+                                                            {/* Time Line - Prioritized */}
+                                                            <div className={cn(
+                                                                "flex items-center gap-1.5 mt-0.5 tabular-nums font-bold text-foreground/80 shrink-0",
+                                                                compact ? "text-[8px]" : "text-[10px]"
+                                                            )}>
+                                                                <Clock className={cn("opacity-40", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
+                                                                <span>{m.start}—{m.end}</span>
+                                                                {cls.meetings?.length > 1 && (
+                                                                    <span className="text-primary/60 font-black text-[7px] bg-primary/5 px-1 rounded-sm">
+                                                                        (+{cls.meetings.length - 1})
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
 
-                                                        <div className="mt-1.5 space-y-0.5">
+                                                        <div className="mt-1.5 space-y-0.5 opacity-40 group-hover/block:opacity-70 transition-opacity overflow-hidden">
                                                             <div className="flex items-center justify-between gap-2 overflow-hidden">
-                                                                <span className={cn("font-bold text-foreground/60 uppercase", compact ? "text-[8px]" : "text-[9px]")}>{cls.className}</span>
-                                                                <div className="flex items-center gap-1 text-foreground/40 group-hover/block:text-foreground/70 transition-soft overflow-hidden">
-                                                                    <MapPin className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
-                                                                    <span className={cn("font-bold truncate max-w-[50px]", compact ? "text-[8px]" : "text-[9px]")}>{m.room}</span>
+                                                                <span className={cn("font-bold uppercase truncate", compact ? "text-[7px]" : "text-[8px]")}>{cls.className}</span>
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <MapPin className={cn(compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
+                                                                    <span className={cn("font-bold truncate max-w-[40px]", compact ? "text-[7px]" : "text-[8px]")}>{m.room}</span>
                                                                 </div>
                                                             </div>
                                                             {!compact && rowHeight >= 65 && (
-                                                                <div className="flex flex-col gap-0.5 pt-1 border-t border-border/50 animate-in fade-in duration-300">
-                                                                    <div className="flex items-center gap-1 text-[8px] font-bold text-foreground/30 group-hover/block:text-foreground/50">
-                                                                        <User className="w-2.5 h-2.5 shrink-0" />
+                                                                <div className="flex flex-col pt-0.5 border-t border-border/30">
+                                                                    <div className="flex items-center gap-1 text-[7px] font-bold truncate">
+                                                                        <User className="w-2.5 h-2.5 shrink-0 opacity-50" />
                                                                         <span className="truncate">{cls.lecturers?.[0]}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1 text-[8px] font-bold text-foreground/30 group-hover/block:text-foreground/50">
-                                                                        <Clock className="w-2.5 h-2.5 shrink-0" />
-                                                                        <span>{m.start}—{m.end}</span>
                                                                     </div>
                                                                 </div>
                                                             )}

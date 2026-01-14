@@ -8,35 +8,41 @@
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Light Mode Tokens */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* Light Mode Tokens - Refined for clarity and premium feel */
+    --background: 240 10% 98.5%;
+    /* Soft off-white canvas */
+    --foreground: 240 10% 6%;
+    /* Deep neutral (not pure black) */
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    /* Pure white cards to pop from background */
+    --card-foreground: 240 10% 6%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 240 10% 6%;
 
-    /* Lime Accent (Cyber-lime but professional) */
-    --primary: 84 81% 44%;
-    --primary-foreground: 60 9.1% 97.8%;
+    /* Professional Brand Green for Light Mode */
+    --primary: 84 81% 36%;
+    /* Slightly darker, more weighted green */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 240 10% 95%;
+    /* Soft sidebar/secondary panels */
+    --secondary-foreground: 240 10% 10%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 240 10% 94%;
+    --muted-foreground: 240 5% 45%;
 
-    --accent: 84 81% 44% / 0.1;
-    --accent-foreground: 84 81% 44%;
+    --accent: 84 81% 36% / 0.08;
+    --accent-foreground: 84 81% 36%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 60 9.1% 97.8%;
+    --destructive: 0 84.2% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 84 81% 44%;
+    --border: 240 10% 90%;
+    /* Subtle borders */
+    --input: 240 10% 90%;
+    --ring: 84 81% 36%;
 
     --radius: 12px;
   }

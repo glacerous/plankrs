@@ -48,13 +48,13 @@ export default function CreatePlanPage() {
     };
 
     const handleCreate = () => {
+        setIsNameTouched(true);
         const validation = validateBlueprint({ name });
         if (!validation.ok) {
             toast.error("Process Aborted", {
                 description: validation.errors[0].message,
                 id: "blueprint-val-error"
             });
-            setIsNameTouched(true);
             nameInputRef.current?.focus();
             return;
         }
@@ -164,7 +164,7 @@ export default function CreatePlanPage() {
 
                     <button
                         onClick={handleCreate}
-                        disabled={!nameValidation.ok || !selectedDsId || selectedSubjectIds.length === 0 || totalSks > 24}
+                        disabled={!selectedDsId || selectedSubjectIds.length === 0 || totalSks > 24}
                         className="w-full bg-primary hover:bg-primary/90 disabled:opacity-20 text-primary-foreground p-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-soft shadow-lg shadow-primary/10 flex items-center justify-center gap-2 active:scale-95 group overflow-hidden"
                     >
                         Initialize
