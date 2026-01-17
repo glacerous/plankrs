@@ -1,16 +1,22 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, Suspense, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
-import { useRouter } from "next/navigation";
-import { ChevronRight, Database, Search, CheckCircle, ListFilter, Layers, BookCheck, AlertCircle } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronRight, Database, Search, CheckCircle, ListFilter, Layers, BookCheck, AlertCircle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { validateBlueprint } from "@/utils/validation";
 
-export default function CreatePlanPage() {
+function CreatePlanContent() {
     const router = useRouter();
-    const { datasources, addPlan } = useAppStore();
+    const searchParams = useSearchParams();
+    const planIdParam = searchParams.get("planId");
+    const { datasources, addPlan, plans, updatePlan } = useAppStore();
+
+    const editingPlan = useMemo(() =>
+        planIdParam ? plans.find(p => p.id === planIdParam) : null
+        , [planIdParam, plans]);
 
     const [name, setName] = useState("");
     const [isNameTouched, setIsNameTouched] = useState(false);
@@ -19,6 +25,23 @@ export default function CreatePlanPage() {
     const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [breakLimit, setBreakLimit] = useState(false);
+
+    // Initialize state if editing
+    useEffect(() => {
+        if (editingPlan) {
+            setName(editingPlan.name);
+            setSelectedDsId(editingPlan.datasourceId);
+            setSelectedSubjectIds(editingPlan.selectedSubjectIds);
+            // If the plan has more than 24 SKS, assume they want to break limit
+            const ds = datasources.find(d => d.id === editingPlan.datasourceId);
+            if (ds) {
+                const sks = ds.subjects
+                    .filter(s => editingPlan.selectedSubjectIds.includes(s.subjectId))
+                    .reduce((acc, s) => acc + s.sks, 0);
+                if (sks > 24) setBreakLimit(true);
+            }
+        }
+    }, [editingPlan, datasources]);
 
     const nameValidation = useMemo(() => validateBlueprint({ name }), [name]);
 
@@ -48,7 +71,7 @@ export default function CreatePlanPage() {
         });
     };
 
-    const handleCreate = () => {
+    const handleAction = () => {
         setIsNameTouched(true);
         const validation = validateBlueprint({ name });
         if (!validation.ok) {
@@ -70,25 +93,51 @@ export default function CreatePlanPage() {
             return;
         }
 
-        const planId = addPlan({
-            name,
-            datasourceId: selectedDsId,
-            selectedSubjectIds,
-            selectedClassBySubjectId: {},
-        });
+        let planId = editingPlan?.id;
 
-        toast.success("Analysis Ready", { description: `Configuring schedule for "${name}"` });
+        if (editingPlan) {
+            updatePlan(editingPlan.id, {
+                name,
+                datasourceId: selectedDsId,
+                selectedSubjectIds,
+                // We keep the old selectedClassBySubjectId, it will just show missing for deleted subjects
+            });
+            toast.success("Blueprint Updated", { description: `Changes applied to "${name}"` });
+        } else {
+            planId = addPlan({
+                name,
+                datasourceId: selectedDsId,
+                selectedSubjectIds,
+                selectedClassBySubjectId: {},
+            });
+            toast.success("Analysis Ready", { description: `Configuring schedule for "${name}"` });
+        }
+
         router.push(`/plan/${planId}`);
     };
 
     return (
         <div className="h-screen flex flex-col no-scrollbar overflow-hidden animate-in fade-in duration-500">
             <header className="p-8 border-b border-border/50 shrink-0 bg-background/80 backdrop-blur-md z-20 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-black tracking-tight text-foreground">Design Plan</h1>
-                    <div className="flex items-center gap-2">
-                        <Layers className="w-3.5 h-3.5 text-muted-foreground/40" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Configuration Pipeline</span>
+                <div className="flex items-center gap-6">
+                    {editingPlan && (
+                        <button
+                            onClick={() => router.back()}
+                            className="p-2 hover:bg-muted rounded-full transition-colors"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                    )}
+                    <div className="space-y-1">
+                        <h1 className="text-2xl font-black tracking-tight text-foreground">
+                            {editingPlan ? "Modify Subjects" : "Design Plan"}
+                        </h1>
+                        <div className="flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5 text-muted-foreground/40" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                                {editingPlan ? `Editing: ${editingPlan.name}` : "Configuration Pipeline"}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -191,11 +240,11 @@ export default function CreatePlanPage() {
                     </section>
 
                     <button
-                        onClick={handleCreate}
+                        onClick={handleAction}
                         disabled={!selectedDsId || selectedSubjectIds.length === 0 || (totalSks > 24 && !breakLimit)}
                         className="w-full bg-primary hover:bg-primary/90 disabled:opacity-20 text-primary-foreground p-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-soft shadow-lg shadow-primary/10 flex items-center justify-center gap-2 active:scale-95 group overflow-hidden"
                     >
-                        Initialize
+                        {editingPlan ? "Update Plan" : "Initialize"}
                         <ChevronRight className="w-4 h-4 transition-soft group-hover:translate-x-1" />
                     </button>
                 </div>
@@ -270,5 +319,13 @@ export default function CreatePlanPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function CreatePlanPage() {
+    return (
+        <Suspense fallback={<div className="h-screen flex items-center justify-center font-bold text-muted-foreground/20 uppercase tracking-widest">Loading Pipeline...</div>}>
+            <CreatePlanContent />
+        </Suspense>
     );
 }

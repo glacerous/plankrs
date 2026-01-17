@@ -90,6 +90,13 @@ export default function PlanDetailPage() {
                             <h2 className="text-xl font-black tracking-tight text-foreground leading-none">{plan.name}</h2>
                             <div className="w-1 h-1 bg-muted-foreground/20 rounded-full" />
                             <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none">{ds.name}</span>
+                            <div className="w-1 h-1 bg-muted-foreground/20 rounded-full" />
+                            <Link
+                                href={`/plan/create?planId=${plan.id}`}
+                                className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none hover:underline"
+                            >
+                                Modify Subjects
+                            </Link>
                         </div>
                     </div>
                 </div>

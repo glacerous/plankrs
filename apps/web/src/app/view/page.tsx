@@ -293,9 +293,15 @@ function ViewContent() {
                         <h1 className="text-[20px] font-black tracking-tighter text-foreground flex items-center gap-2">
                             KRSLAB <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">Master Grid</span>
                         </h1>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 flex items-center gap-1.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 flex items-center gap-1.5 mb-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> {plan.selectedSubjectIds.length} Matakuliah Terpilih
                         </p>
+                        <Link
+                            href={`/plan/create?planId=${plan.id}`}
+                            className="text-[9px] font-bold text-primary uppercase tracking-widest leading-none hover:underline"
+                        >
+                            Modify Subjects
+                        </Link>
                     </div>
 
                     <div className="h-10 w-[1px] bg-border/50 mx-2" />
