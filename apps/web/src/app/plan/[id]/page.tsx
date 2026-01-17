@@ -3,7 +3,7 @@
 import { useAppStore, Subject } from "@/lib/store";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, ChevronRight, Users, MapPin, Clock, Calendar, ChevronDown, ChevronUp, AlertTriangle, Check, Zap, Settings2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronRight, Users, MapPin, Clock, Calendar, ChevronDown, ChevronUp, AlertTriangle, Check, Zap, Settings2, User } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { checkClassConflict } from "@krs/engine";
@@ -269,6 +269,10 @@ function SubjectAccordion({ subject, selectedClassId, onSelectClass, conflicts }
                                                 </div>
                                             </div>
                                         ))}
+                                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-primary/60 border-t border-border/20 pt-1.5 mt-0.5">
+                                            <User className="w-2.5 h-2.5" />
+                                            <span className="truncate">{cls.lecturers?.join(", ") || "No Lecturer"}</span>
+                                        </div>
                                     </div>
                                 </div>
                             );

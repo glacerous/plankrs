@@ -274,14 +274,12 @@ export function ScheduleGrid({ selectedClasses, conflicts, frozenSubjectIds = []
                                                                     <span className={cn("font-bold truncate max-w-[40px]", compact ? "text-[7px]" : "text-[8px]")}>{m.room}</span>
                                                                 </div>
                                                             </div>
-                                                            {!compact && rowHeight >= 65 && (
-                                                                <div className="flex flex-col pt-0.5 border-t border-border/30">
-                                                                    <div className="flex items-center gap-1 text-[7px] font-bold truncate">
-                                                                        <User className="w-2.5 h-2.5 shrink-0 opacity-50" />
-                                                                        <span className="truncate">{cls.lecturers?.[0]}</span>
-                                                                    </div>
+                                                            <div className="flex flex-col pt-0.5 border-t border-border/30">
+                                                                <div className="flex items-center gap-1 text-[7px] font-bold truncate">
+                                                                    <User className="w-2.5 h-2.5 shrink-0 opacity-50" />
+                                                                    <span className="truncate">{cls.lecturers?.[0] || "No Lecturer"}</span>
                                                                 </div>
-                                                            )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
