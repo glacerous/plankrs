@@ -146,7 +146,7 @@ export default function CreatePlanPage() {
                         <div className="text-center space-y-1">
                             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Total Weight</p>
                             <div className="flex items-center justify-center gap-1.5">
-                                <p className={cn("text-3xl font-black tabular-nums transition-colors", totalSks > 24 ? "text-destructive" : "text-primary")}>{totalSks}</p>
+                                <p className={cn("text-3xl font-black tabular-nums transition-colors", totalSks > 26 ? "text-destructive" : "text-primary")}>{totalSks}</p>
                                 <span className="text-[10px] font-black text-muted-foreground opacity-30 uppercase">SKS</span>
                             </div>
                         </div>
@@ -157,14 +157,14 @@ export default function CreatePlanPage() {
                             </div>
                             <div className="bg-background/50 border border-border/40 p-3 rounded-lg text-center">
                                 <p className="text-[8px] font-bold text-muted-foreground/60 uppercase">Safe Limit</p>
-                                <p className="text-xs font-black text-foreground">24</p>
+                                <p className="text-xs font-black text-foreground">26</p>
                             </div>
                         </div>
                     </section>
 
                     <button
                         onClick={handleCreate}
-                        disabled={!selectedDsId || selectedSubjectIds.length === 0 || totalSks > 24}
+                        disabled={!selectedDsId || selectedSubjectIds.length === 0 || totalSks > 26}
                         className="w-full bg-primary hover:bg-primary/90 disabled:opacity-20 text-primary-foreground p-4 rounded-xl font-black text-[11px] uppercase tracking-widest transition-soft shadow-lg shadow-primary/10 flex items-center justify-center gap-2 active:scale-95 group overflow-hidden"
                     >
                         Initialize
