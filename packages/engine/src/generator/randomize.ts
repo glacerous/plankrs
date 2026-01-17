@@ -174,7 +174,29 @@ export function generateRandomValidSchedules(
             if (!hasConflict) {
                 fitSections++;
                 currentPicks[course.subjectId] = section;
-                backtrack(courseIdx + 1, currentPicks);
+
+                // Early rule pruning: Check only monotonic rules that can't be fixed by adding more courses
+                const fullPicks = { ...currentPicks, ...(engine.initialPicks ?? {}) };
+                const prunableRules = rules.filter(r =>
+                    r.enabled && ["noDay", "timeWindow", "maxDaysPerWeek", "compactDays"].includes(r.type)
+                );
+
+                let rulesOk = true;
+                if (prunableRules.length > 0) {
+                    const evalRes = evaluateAllRules(prunableRules, { picks: fullPicks });
+                    if (!evalRes.ok) {
+                        rulesOk = false;
+                        // Still track these as failures for the final summary if we find nothing
+                        for (const ruleId of evalRes.fails) {
+                            failureCounts.set(ruleId, (failureCounts.get(ruleId) || 0) + 1);
+                        }
+                    }
+                }
+
+                if (rulesOk) {
+                    backtrack(courseIdx + 1, currentPicks);
+                }
+
                 delete currentPicks[course.subjectId];
             }
         }
