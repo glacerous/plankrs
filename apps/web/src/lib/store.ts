@@ -104,7 +104,7 @@ interface AppStore {
     saveActiveVariant: (planId: string) => void;
     deleteSavedVariant: (planId: string, savedId: string) => void;
     setActiveSavedVariant: (planId: string, savedId: string | null) => void;
-    applyActiveSavedVariantToPlan: (planId: string) => void;
+    applyActiveSavedVariantToPlan: (planId: string, savedId?: string) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -510,12 +510,15 @@ export const useAppStore = create<AppStore>()(
                 }));
             },
 
-            applyActiveSavedVariantToPlan: (planId: string) => {
+            applyActiveSavedVariantToPlan: (planId: string, savedId?: string) => {
                 set((state: AppStore) => {
                     const plan = state.plans.find((p: Plan) => p.id === planId);
-                    if (!plan || !plan.activeSavedVariantId || !plan.savedVariants) return state;
+                    if (!plan || !plan.savedVariants) return state;
 
-                    const saved = plan.savedVariants.find((sv) => sv.id === plan.activeSavedVariantId);
+                    const idToApply = savedId || plan.activeSavedVariantId;
+                    if (!idToApply) return state;
+
+                    const saved = plan.savedVariants.find((sv) => sv.id === idToApply);
                     if (!saved) return state;
 
                     // Apply saved + overrides

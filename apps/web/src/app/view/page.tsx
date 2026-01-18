@@ -38,6 +38,7 @@ function ViewContent() {
         generateVariantsForPlan, setActiveVariantIndex, applyActiveVariantToPlan,
         setRulesForPlan, toggleFreezeSubject,
         saveActiveVariant, setActiveSavedVariant, updatePlan, setPreviewOverride,
+        applyActiveSavedVariantToPlan,
         isGenerating
     } = useAppStore();
 
@@ -270,7 +271,11 @@ function ViewContent() {
 
     const handleApply = () => {
         if (!plan) return;
-        applyActiveVariantToPlan(plan.id);
+        if (isSavedPreview) {
+            applyActiveSavedVariantToPlan(plan.id);
+        } else {
+            applyActiveVariantToPlan(plan.id);
+        }
         setActiveVariantIndex(plan.id, null);
         setActiveSavedVariant(plan.id, null);
         toast.success("Variant Applied", { id: "variant-applied", description: "Schedule update complete." });

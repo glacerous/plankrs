@@ -151,7 +151,7 @@ export function SavedVariants({ plan, datasource, isOpen, onOpenChange }: SavedV
                                                     </button>
                                                     <button
                                                         onClick={() => {
-                                                            applyActiveSavedVariantToPlan(plan.id);
+                                                            applyActiveSavedVariantToPlan(plan.id, sv.id);
                                                             onOpenChange(false);
                                                             setActiveSavedVariant(plan.id, null); // Clear preview after apply
                                                         }}
